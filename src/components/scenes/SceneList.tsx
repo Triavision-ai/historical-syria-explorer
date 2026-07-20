@@ -1,5 +1,6 @@
 import { useExplorerStore } from '@/hooks/useExplorerStore';
 import { formatCaptureDate } from '@/utils/date';
+import { cloudCoverOf } from '@/utils/scene';
 import type { ImageScene } from '@/types';
 
 const PROVIDER_BADGE_STYLES: Record<string, string> = {
@@ -102,6 +103,7 @@ function SceneRow({
           <p className="truncate text-xs text-gray-400">
             {scene.mission}
             {scene.resolution !== undefined ? ` · ${scene.resolution} m` : ''}
+            {cloudCoverOf(scene) !== null ? ` · ☁ ${Math.round(cloudCoverOf(scene) ?? 0)}%` : ''}
           </p>
         </div>
         <span

@@ -50,6 +50,16 @@ export function MetadataPanel() {
           />
         )}
 
+        {sceneLayer && (
+          <button
+            type="button"
+            onClick={() => setActivePanel(null)}
+            className="mb-3 w-full rounded-lg bg-accent-500 px-4 py-2 text-sm font-semibold text-surface-950 hover:bg-accent-400"
+          >
+            Show on map
+          </button>
+        )}
+
         {sceneLayerLoading && <p className="mb-3 text-xs text-accent-400">Loading preview…</p>}
         {!sceneLayerLoading && !sceneLayer && (
           <p className="mb-3 rounded-lg border border-amber-hl/30 bg-amber-hl/10 px-3 py-2 text-xs text-amber-hl">

@@ -5,6 +5,7 @@ import { Timeline } from '@/components/timeline/Timeline';
 import { SceneList } from '@/components/scenes/SceneList';
 import { MetadataPanel } from '@/components/scenes/MetadataPanel';
 import { ViewControls } from '@/components/controls/ViewControls';
+import { WelcomeHint } from '@/components/onboarding/WelcomeHint';
 import { useExplorerStore } from '@/hooks/useExplorerStore';
 
 /**
@@ -43,6 +44,8 @@ export function HomePage() {
           <SearchBox />
         </div>
       </header>
+
+      <WelcomeHint />
 
       {/* Panel toggle (when closed) */}
       {activePanel === null && (

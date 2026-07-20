@@ -4,6 +4,7 @@ import type { ProviderSearchOutcome } from '@/services';
 import { providerRegistry, sceneSearchService } from '@/services';
 import { bboxAroundPoint } from '@/utils/bbox';
 import { yearDistance } from '@/utils/date';
+import { cloudCoverOf } from '@/utils/scene';
 import {
   DEFAULT_LOCATION,
   DEFAULT_MAX_CLOUD_COVER,
@@ -114,6 +115,9 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
       // Ignore stale loads if the user has moved on to another scene.
       if (get().selectedScene?.id === scene.id) {
         set({ sceneLayer: layer, sceneLayerLoading: false });
+        // On phones the bottom sheet covers the map — once the image is
+        // draped, close the sheet so the result is immediately visible.
+        if (layer && isNarrowViewport()) set({ activePanel: null });
       }
     } catch (error) {
       console.error(`Failed to load scene ${scene.id}`, error);
@@ -144,10 +148,11 @@ export function closestSceneToYear(
   for (const scene of scenes) {
     if (!scene.captureDate) continue;
     const distance = yearDistance(scene.captureDate, year);
-    // Prefer displayable scenes: a previewable image beats a metadata-only
-    // record at equal-ish distance (within one year).
-    const displayBonus = scene.previewUrl ? 0 : 0.9;
-    const score = distance + displayBonus;
+    // Prefer displayable scenes (a previewable image beats a metadata-only
+    // record) and clear skies (full overcast costs up to two "years").
+    const displayPenalty = scene.previewUrl ? 0 : 0.9;
+    const cloudPenalty = ((cloudCoverOf(scene) ?? 0) / 100) * 2;
+    const score = distance + displayPenalty + cloudPenalty;
     if (score < bestDistance && distance <= toleranceYears) {
       best = scene;
       bestDistance = score;
@@ -158,4 +163,9 @@ export function closestSceneToYear(
 
 function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
+}
+
+/** Matches Tailwind's `sm` breakpoint — below it panels render as a bottom sheet. */
+function isNarrowViewport(): boolean {
+  return typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches;
 }
