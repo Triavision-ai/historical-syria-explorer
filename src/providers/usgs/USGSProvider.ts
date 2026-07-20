@@ -12,6 +12,7 @@ import { SYRIA_BBOX } from '@/config/app.config';
 import { M2MClient } from './m2mClient';
 import type { M2MSceneResult } from './m2mClient';
 import { DECLASS_SCENES, USGS_DECLASS_PROVIDER_ID } from './declassCatalog';
+import { loadHarvestedCatalog } from './catalogLoader';
 
 /** M2M dataset names for the declassified collections. */
 const DECLASS_DATASETS = ['declassi', 'declassii', 'declassiii'];
@@ -21,8 +22,11 @@ const DECLASS_DATASETS = ['declassi', 'declassii', 'declassiii'];
  * 1960–1984).
  *
  * Two modes:
- *  - Without credentials: serves the curated local catalog (metadata only,
- *    ordering via EarthExplorer). Always available.
+ *  - Without credentials (default): serves the pre-harvested Syria-wide
+ *    catalog (public/catalog/declass-syria.json, built once from the M2M
+ *    API by scripts/harvest-declass.mjs) merged with the curated seed
+ *    scenes. The declassified archive is closed (1960–1984), so a one-time
+ *    harvest gives permanent coverage with no runtime credentials.
  *  - With M2M credentials (VITE_USGS_M2M_USERNAME/TOKEN): live scene-search
  *    against the M2M API across all declass datasets.
  */
@@ -56,16 +60,18 @@ export class USGSProvider implements ImageryProvider {
 
   async status(): Promise<ProviderStatus> {
     if (this.m2m.isConfigured) return { state: 'ready' };
+    const harvested = await loadHarvestedCatalog();
+    if (harvested.length > 0) return { state: 'ready' };
     return {
       state: 'unconfigured',
       reason:
-        'Running on the curated local catalog. Set VITE_USGS_M2M_USERNAME and ' +
-        'VITE_USGS_M2M_TOKEN for live M2M search of the full declassified archive.',
+        'Running on the curated seed catalog only. Generate the Syria-wide ' +
+        'catalog with scripts/harvest-declass.mjs (or set VITE_USGS_M2M_* for live search).',
     };
   }
 
   async search(query: SceneSearchQuery, signal?: AbortSignal): Promise<ImageScene[]> {
-    if (!this.m2m.isConfigured) return this.searchLocalCatalog(query);
+    if (!this.m2m.isConfigured) return this.searchStaticCatalogs(query);
 
     const perDataset = await Promise.allSettled(
       DECLASS_DATASETS.map((dataset) => this.m2m.sceneSearch(dataset, query, signal)),
@@ -76,22 +82,35 @@ export class USGSProvider implements ImageryProvider {
       const dataset = DECLASS_DATASETS[index] ?? 'declass';
       for (const record of result.value) scenes.push(this.toScene(record, dataset));
     });
-    // The curated catalog can contain scenes M2M search misses (or vice
-    // versa) — merge with local results, de-duplicated by entity id.
+    // The static catalogs can contain scenes M2M search misses (or vice
+    // versa) — merge, de-duplicated by entity id.
     const seen = new Set(scenes.map((scene) => scene.id));
-    for (const scene of this.searchLocalCatalog(query)) {
+    for (const scene of await this.searchStaticCatalogs(query)) {
       if (!seen.has(scene.id)) scenes.push(scene);
     }
     return scenes;
   }
 
   /**
-   * Declassified film products are ordered through EarthExplorer; there is
-   * no legally hostable tile/preview source yet, so scenes are not directly
-   * displayable. The UI falls back to metadata + ordering links.
+   * Harvested scenes carry the official USGS browse image, draped over the
+   * scene footprint. Scenes without a browse image (curated seeds before
+   * harvesting) stay metadata-only with EarthExplorer ordering links.
    */
-  async load(_scene: ImageScene): Promise<SceneLayer | null> {
-    return null;
+  async load(scene: ImageScene): Promise<SceneLayer | null> {
+    if (!scene.previewUrl) return null;
+    const [w, s, e, n] = scene.bounds;
+    return {
+      kind: 'georeferenced-image',
+      url: scene.previewUrl,
+      coordinates: [
+        [w, n],
+        [e, n],
+        [e, s],
+        [w, s],
+      ],
+      bounds: scene.bounds,
+      attribution: 'U.S. Geological Survey, declassified national imagery',
+    };
   }
 
   async metadata(sceneId: string, signal?: AbortSignal): Promise<Record<string, unknown>> {
@@ -105,8 +124,12 @@ export class USGSProvider implements ImageryProvider {
     return local?.metadata ?? {};
   }
 
-  private searchLocalCatalog(query: SceneSearchQuery): ImageScene[] {
-    return DECLASS_SCENES.filter((scene) => {
+  /** Curated seed scenes + the pre-harvested Syria-wide catalog. */
+  private async searchStaticCatalogs(query: SceneSearchQuery): Promise<ImageScene[]> {
+    const harvested = await loadHarvestedCatalog();
+    const harvestedIds = new Set(harvested.map((scene) => scene.id));
+    const seeds = DECLASS_SCENES.filter((scene) => !harvestedIds.has(scene.id));
+    return [...harvested, ...seeds].filter((scene) => {
       if (query.dateFrom && scene.captureDate < query.dateFrom) return false;
       if (query.dateTo && scene.captureDate > query.dateTo) return false;
       switch (query.spatial.kind) {
