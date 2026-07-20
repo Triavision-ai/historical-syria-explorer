@@ -27,6 +27,12 @@ interface DeclassCatalogFile {
   scenes: DeclassCatalogRecord[];
 }
 
+const DATASET_LABELS: Record<string, string> = {
+  declassi: 'Declass 1 (1960 to 1972)',
+  declassii: 'Declass 2 (1963 to 1980)',
+  declassiii: 'Declass 3 (1971 to 1984)',
+};
+
 const MISSION_BY_DATASET: Record<string, string> = {
   declassi: 'CORONA / ARGON / LANYARD',
   declassii: 'KH-7 GAMBIT / KH-9 HEXAGON',
@@ -73,11 +79,15 @@ function toScene(record: DeclassCatalogRecord): ImageScene | null {
     bounds,
     ...(record.thumbnailUrl ? { thumbnail: record.thumbnailUrl } : {}),
     ...(record.browseUrl ? { previewUrl: record.browseUrl } : {}),
-    downloadUrl: `${ENDPOINTS.earthExplorer}/scene/metadata/full/${record.dataset}/${record.entityId}/`,
+    downloadUrl: ENDPOINTS.earthExplorer,
     metadata: {
       entityId: record.entityId,
       dataset: record.dataset,
       approximateFootprint: true,
+      orderingNote:
+        'On EarthExplorer (free account): Data Sets → Declassified Data → ' +
+        `${DATASET_LABELS[record.dataset] ?? record.dataset} → Additional Criteria → ` +
+        `Entity ID ${record.entityId} → Results.`,
       ...record.metadata,
     },
     license: {

@@ -161,7 +161,7 @@ export class USGSProvider implements ImageryProvider {
       bounds,
       ...(thumbnail ? { thumbnail } : {}),
       ...(preview ? { previewUrl: preview } : {}),
-      downloadUrl: `${ENDPOINTS.earthExplorer}/scene/metadata/full/${dataset}/${record.entityId}/`,
+      downloadUrl: ENDPOINTS.earthExplorer,
       metadata,
       license: {
         id: 'public-domain',

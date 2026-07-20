@@ -23,6 +23,7 @@ export function MetadataPanel() {
   const metadataRows = Object.entries(scene.metadata)
     .filter(([key, value]) => !PROMINENT_KEYS.has(key) && isScalar(value))
     .slice(0, MAX_METADATA_ROWS);
+  const orderingNote = scene.metadata['orderingNote'];
 
   return (
     <div className="flex h-full flex-col">
@@ -67,6 +68,12 @@ export function MetadataPanel() {
           <Field label="License" value={scene.license.label} />
         </dl>
 
+        {typeof orderingNote === 'string' && (
+          <p className="mt-4 rounded-lg border border-surface-600 bg-surface-800/60 px-3 py-2 text-xs leading-relaxed text-gray-300">
+            {orderingNote}
+          </p>
+        )}
+
         {scene.downloadUrl && (
           <a
             href={scene.downloadUrl}
@@ -74,7 +81,7 @@ export function MetadataPanel() {
             rel="noreferrer"
             className="mt-4 block rounded-lg bg-accent-500 px-4 py-2 text-center text-sm font-semibold text-surface-950 hover:bg-accent-400"
           >
-            Open source record / download
+            {orderingNote ? 'Open USGS EarthExplorer' : 'Open source record / download'}
           </a>
         )}
 

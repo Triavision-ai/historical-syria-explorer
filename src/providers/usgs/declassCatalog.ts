@@ -27,7 +27,9 @@ export const DECLASS_SCENES: ImageScene[] = [
     captureDate: '1966-04-25T00:00:00Z',
     resolution: 0.6,
     bounds: [36.5, 34.9, 37.05, 35.4],
-    downloadUrl: `${ENDPOINTS.earthExplorer}/scene/metadata/full/5e839ff8cfa94807/DZB00402700090H020001/`,
+    // EarthExplorer has no stable public per-scene deep link; send users to
+    // the archive entry point with ordering instructions in the metadata.
+    downloadUrl: ENDPOINTS.earthExplorer,
     metadata: {
       entityId: 'DZB00402700090H020001',
       dataset: 'declassii',
@@ -38,8 +40,10 @@ export const DECLASS_SCENES: ImageScene[] = [
       coverage: 'Hama and surroundings, Syria',
       approximateFootprint: true,
       orderingNote:
-        'Scanned product available through USGS EarthExplorer (free account). ' +
-        'On-demand scan if not yet digitized.',
+        'On EarthExplorer (free account): Data Sets → Declassified Data → ' +
+        'Declass 2 (1963 to 1980) → Additional Criteria → Entity ID ' +
+        'DZB00402700090H020001 → Results. Scanned product downloadable; ' +
+        'on-demand scan if not yet digitized.',
     },
     license: PUBLIC_DOMAIN,
   },
