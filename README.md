@@ -23,12 +23,12 @@ Built for reconstruction, heritage preservation, research, agriculture, and envi
 
 ## Live imagery sources (no API keys required)
 
-| Provider                                      | Coverage                 | Backend                                                                                       |
-| --------------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------------- |
-| **Landsat (USGS)**                            | 1972 → today, 30–60 m    | [LandsatLook STAC API](https://landsatlook.usgs.gov/stac-server) — public domain              |
-| **Sentinel-2 (Copernicus)**                   | 2015 → today, 10 m       | [Earth Search STAC on AWS](https://earth-search.aws.element84.com/v1) — free with attribution |
-| **USGS Declassified** (CORONA/GAMBIT/HEXAGON) | 1960–1984, down to 0.6 m | Curated catalog now; full [M2M API](https://m2m.cr.usgs.gov/) search with a free USGS token   |
-| **Google Earth Engine**                       | 1972 → today             | Provider prepared; activates with an OAuth client id (roadmap V3)                             |
+| Provider                                      | Coverage                 | Backend                                                                                         |
+| --------------------------------------------- | ------------------------ | ----------------------------------------------------------------------------------------------- |
+| **Landsat (USGS)**                            | 1972 → today, 30–60 m    | [LandsatLook STAC API](https://landsatlook.usgs.gov/stac-server) — public domain                |
+| **Sentinel-2 (Copernicus)**                   | 2015 → today, 10 m       | [Earth Search STAC on AWS](https://earth-search.aws.element84.com/v1) — free with attribution   |
+| **USGS Declassified** (CORONA/GAMBIT/HEXAGON) | 1960–1984, down to 0.6 m | Pre-harvested Syria-wide catalog (see below) or live [M2M API](https://m2m.cr.usgs.gov/) search |
+| **Google Earth Engine**                       | 1972 → today             | Provider prepared; activates with an OAuth client id (roadmap V3)                               |
 
 ---
 
@@ -135,6 +135,17 @@ Copy `.env.example` to `.env.local`. The app is fully functional without credent
 - `VITE_USGS_M2M_USERNAME` / `VITE_USGS_M2M_TOKEN` — live search of the complete USGS declassified archive (free account: [ERS registration](https://ers.cr.usgs.gov/register), token: [app token generator](https://ers.cr.usgs.gov/password/appgenerate)).
 - `VITE_EE_CLIENT_ID` — Google Earth Engine OAuth client (V3).
 - `VITE_TITILER` — a [TiTiler](https://developmentseed.org/titiler/) instance to render full-resolution Cloud-Optimized GeoTIFFs as map tiles instead of browse previews.
+
+### Syria-wide declassified catalog (one-time harvest)
+
+The declassified archive is **closed** — no scene has been added since 1984. That makes a one-time harvest possible: `scripts/harvest-declass.mjs` pages through the M2M API for all three declass datasets over Syria and writes `public/catalog/declass-syria.json`, including official USGS browse-image URLs. Once committed, **every visitor gets automatic, credential-free 1960s–80s coverage for all of Syria**, with browse previews draped on the map.
+
+To generate it:
+
+1. Create a free USGS account ([register](https://ers.cr.usgs.gov/register)), request M2M access ([profile → access](https://ers.cr.usgs.gov/profile/access)), and generate an application token ([token generator](https://ers.cr.usgs.gov/password/appgenerate)).
+2. Either run locally — `USGS_M2M_USERNAME=you USGS_M2M_TOKEN=xxx node scripts/harvest-declass.mjs` — and commit the JSON, **or** add `USGS_M2M_USERNAME` / `USGS_M2M_TOKEN` as repository secrets and run the **"Harvest USGS declassified catalog"** workflow from the Actions tab. The workflow commits the catalog to `main`, which redeploys the site automatically.
+
+Credentials are only used at harvest time; the deployed site never sees them.
 
 ## GitHub Pages deployment
 
