@@ -6,22 +6,23 @@
   <meta name="theme-color" content="#000000">
   <title>Hama 1966</title>
   <style>
-    *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:#000;overflow:hidden}.viewer{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#000;touch-action:none;overflow:hidden}.viewer img{display:block;max-width:none;user-select:none;-webkit-user-drag:none;will-change:transform;transform-origin:center}.hint{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translateX(-50%);padding:8px 12px;border-radius:999px;background:rgba(0,0,0,.65);color:#fff;font:13px system-ui;white-space:nowrap;pointer-events:none;transition:opacity .5s}.hint.hide{opacity:0}
+    *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:#000;overflow:hidden}.viewer{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#000;touch-action:none;overflow:hidden}.viewer img{display:block;max-width:none;user-select:none;-webkit-user-drag:none;will-change:transform;transform-origin:center}.hint,.error{position:fixed;left:50%;transform:translateX(-50%);padding:8px 12px;border-radius:999px;background:rgba(0,0,0,.68);color:#fff;font:13px system-ui;white-space:nowrap}.hint{bottom:calc(18px + env(safe-area-inset-bottom));pointer-events:none;transition:opacity .5s}.hint.hide{opacity:0}.error{top:50%;white-space:normal;text-align:center;max-width:85%;display:none}.error a{color:#fff}
   </style>
 </head>
 <body>
   <main id="viewer" class="viewer" aria-label="Historical satellite image of Hama in 1966">
-    <img id="image" src="assets/hama-1966.jpg" alt="Black and white historical satellite image of central Hama, Syria, captured in 1966">
+    <img id="image" src="https://tse1.mm.bing.net/th/id/OIP.NvgfA_dreGiiJELvMsp0AAHaHa?r=0&pid=Api" alt="Black and white historical satellite image of central Hama, Syria, captured in 1966">
   </main>
   <div id="hint" class="hint">Pinch to zoom · drag to move · double-tap to reset</div>
+  <div id="error" class="error">The image host blocked loading. <a href="https://spacefromspace.com/declassified-satellite-images/hama-syria-19660425-dzb00402700090h020001/">Open the original viewer</a>.</div>
   <script>
-    const v=document.getElementById('viewer'),im=document.getElementById('image'),h=document.getElementById('hint');
+    const v=document.getElementById('viewer'),im=document.getElementById('image'),h=document.getElementById('hint'),er=document.getElementById('error');
     let s=1,x=0,y=0,sx=0,sy=0,d0=0,s0=1,last=0;
     const clamp=(n,a,b)=>Math.min(b,Math.max(a,n));
     function fit(){s=Math.max(innerWidth/im.naturalWidth,innerHeight/im.naturalHeight);x=0;y=0;draw()}
     function draw(){im.style.transform=`translate(${x}px,${y}px) scale(${s})`}
     const dist=(a,b)=>Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
-    im.addEventListener('load',fit);addEventListener('resize',fit);
+    im.addEventListener('load',fit);im.addEventListener('error',()=>{er.style.display='block'});addEventListener('resize',fit);
     v.addEventListener('pointerdown',e=>{v.setPointerCapture(e.pointerId);sx=e.clientX-x;sy=e.clientY-y;h.classList.add('hide')});
     v.addEventListener('pointermove',e=>{if(e.buttons===1){x=e.clientX-sx;y=e.clientY-sy;draw()}});
     v.addEventListener('wheel',e=>{e.preventDefault();s=clamp(s*(e.deltaY<0?1.12:.9),.5,8);draw()},{passive:false});
