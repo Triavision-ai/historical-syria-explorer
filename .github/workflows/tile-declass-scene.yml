@@ -32,6 +32,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   tile:
@@ -72,10 +73,10 @@ jobs:
             *.tar) tar -xf "$FILE" -C /tmp/extracted ;;
             *) cp "$FILE" /tmp/extracted/ ;;
           esac
-          TIF=$(find /tmp/extracted -type f \( -iname '*.tif' -o -iname '*.tiff' -o -iname '*.ntf' \) -printf '%s %p\n' | sort -rn | head -1 | cut -d' ' -f2-)
-          if [ -z "$TIF" ]; then echo "No raster found"; find /tmp/extracted -type f | head; exit 1; fi
-          echo "tif=$TIF" >> "$GITHUB_OUTPUT"
-          gdalinfo "$TIF" | head -20
+          rm -f "$FILE"
+          COUNT=$(find /tmp/extracted -type f \( -iname '*.tif' -o -iname '*.tiff' \) | wc -l)
+          if [ "$COUNT" = "0" ]; then echo "No raster found"; find /tmp/extracted -type f | head; exit 1; fi
+          echo "Found $COUNT film segment(s)"
 
       - name: Georeference and tile
         env:
@@ -84,15 +85,15 @@ jobs:
           CORNER_ORDER: ${{ inputs.corner_order }}
         run: |
           set -e
-          TIF="${{ steps.extract.outputs.tif }}"
-          SIZE=$(gdalinfo "$TIF" | grep 'Size is' | sed 's/Size is //;s/,//')
-          W=$(echo "$SIZE" | cut -d' ' -f1)
-          H=$(echo "$SIZE" | cut -d' ' -f2)
-          GCPS=$(node scripts/print-gcps.mjs "${{ steps.download.outputs.entity }}" "${{ inputs.dataset }}" "$W" "$H" | tail -1)
-          echo "GCPs: $GCPS"
-          gdal_translate -of GTiff -a_srs EPSG:4326 $GCPS "$TIF" /tmp/gcp.tif
-          gdalwarp -t_srs EPSG:3857 -r bilinear -order 1 -dstalpha \
-            -co COMPRESS=JPEG -co TILED=YES /tmp/gcp.tif /tmp/warped.tif
+          PREP=$(node scripts/prepare-frame.mjs "${{ steps.download.outputs.entity }}" "${{ inputs.dataset }}" /tmp/extracted)
+          echo "$PREP"
+          VRT=$(echo "$PREP" | grep '^VRT:' | cut -d: -f2-)
+          GCPS=$(echo "$PREP" | grep '^GCPS:' | cut -d: -f2-)
+          gdal_translate -of VRT -a_srs EPSG:4326 $GCPS "$VRT" /tmp/gcp.vrt
+          TR=$(python3 -c "print(156543.03 / 2 ** ${{ inputs.max_zoom }})")
+          gdalwarp -t_srs EPSG:3857 -r bilinear -order 1 -dstalpha -tr "$TR" "$TR" \
+            -co COMPRESS=JPEG -co TILED=YES --config GDAL_CACHEMAX 2048 \
+            /tmp/gcp.vrt /tmp/warped.tif
           gdal2tiles.py --xyz -z "8-${{ inputs.max_zoom }}" -w none --processes=4 /tmp/warped.tif /tmp/tiles
           rm -rf "public/tiles/${{ steps.download.outputs.entity }}"
           mkdir -p public/tiles
