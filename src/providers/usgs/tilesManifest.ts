@@ -29,8 +29,7 @@ async function fetchManifest(): Promise<Record<string, TiledSceneEntry>> {
 
 /** Absolute XYZ template for a tiled scene (MapLibre needs absolute URLs). */
 export function tileUrlTemplate(entityId: string): string {
-  return new URL(
-    `${import.meta.env.BASE_URL}tiles/${entityId}/{z}/{x}/{y}.png`,
-    window.location.origin,
-  ).toString();
+  // Plain concatenation — new URL() would percent-encode the {z}/{x}/{y}
+  // placeholders and break MapLibre's template substitution.
+  return `${window.location.origin}${import.meta.env.BASE_URL}tiles/${entityId}/{z}/{x}/{y}.png`;
 }
