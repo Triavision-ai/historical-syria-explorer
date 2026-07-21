@@ -88,18 +88,22 @@ export function ExplorerMap() {
         </div>
       )}
 
-      {/* Main map: carries the historical overlay; clipped while comparing. */}
+      {/* Main map: carries the historical overlay; while comparing it is
+          revealed only left of the divider via a width-clipped wrapper with
+          a full-viewport inner box (clip-path proved unreliable on iOS). */}
       <div
-        className="absolute inset-0"
-        style={comparing ? { clipPath: `inset(0 ${(1 - swipe) * 100}% 0 0)` } : undefined}
+        className="absolute inset-y-0 left-0 overflow-hidden"
+        style={{ width: comparing ? `${swipe * 100}%` : '100%' }}
       >
-        <MapCanvas
-          center={center}
-          zoom={zoom}
-          withNavControl
-          onMapReady={setMainMap}
-          onMapDestroy={() => setMainMap(null)}
-        />
+        <div className="absolute inset-y-0 left-0" style={{ width: '100vw' }}>
+          <MapCanvas
+            center={center}
+            zoom={zoom}
+            withNavControl
+            onMapReady={setMainMap}
+            onMapDestroy={() => setMainMap(null)}
+          />
+        </div>
       </div>
 
       {comparing && (

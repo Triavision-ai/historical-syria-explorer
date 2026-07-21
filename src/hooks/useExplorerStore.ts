@@ -149,10 +149,15 @@ export function closestSceneToYear(
     if (!scene.captureDate) continue;
     const distance = yearDistance(scene.captureDate, year);
     // Prefer displayable scenes (a previewable image beats a metadata-only
-    // record) and clear skies (full overcast costs up to two "years").
+    // record), clear skies (full overcast costs up to two "years"), and
+    // frames whose preview is actually legible at the current location: a
+    // browse image stretched over a huge film footprint (e.g. KH-9 mapping
+    // frames spanning >2°) is mush at city zoom, so it costs extra.
     const displayPenalty = scene.previewUrl ? 0 : 0.9;
     const cloudPenalty = ((cloudCoverOf(scene) ?? 0) / 100) * 2;
-    const score = distance + displayPenalty + cloudPenalty;
+    const span = Math.max(scene.bounds[2] - scene.bounds[0], scene.bounds[3] - scene.bounds[1]);
+    const hugeFramePenalty = span > 2 ? 1.5 : 0;
+    const score = distance + displayPenalty + cloudPenalty + hugeFramePenalty;
     if (score < bestDistance && distance <= toleranceYears) {
       best = scene;
       bestDistance = score;
