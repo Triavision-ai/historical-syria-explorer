@@ -8,6 +8,7 @@ const PROVIDER_BADGE_STYLES: Record<string, string> = {
   landsat: 'bg-emerald-400/15 text-emerald-300',
   sentinel2: 'bg-accent-400/15 text-accent-400',
   'esri-wayback': 'bg-fuchsia-400/15 text-fuchsia-300',
+  'maxar-open': 'bg-rose-400/15 text-rose-300',
 };
 
 /** Chronological list of every scene found for the current location. */

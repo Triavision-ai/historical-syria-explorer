@@ -38,7 +38,9 @@ export function createLandsatProvider(): StacImageryProvider {
     },
     cloudCoverField: 'eo:cloud_cover',
     previewAssetKeys: ['rendered_preview', 'reduced_resolution_browse', 'thumbnail'],
-    cogAssetKeys: ['red', 'visual'],
+    // Only a true-color asset is useful as a tiled overlay; single bands
+    // (e.g. "red") would render grayscale through the COG tiler.
+    cogAssetKeys: ['visual'],
     missionOf: (item) => {
       const platform = String(item.properties['platform'] ?? '');
       return PLATFORM_LABELS[platform] ?? platform.replace('_', ' ') ?? 'Landsat';

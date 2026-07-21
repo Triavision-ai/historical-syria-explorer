@@ -4,6 +4,7 @@ import { createLandsatProvider } from './landsat/LandsatProvider';
 import { createSentinelProvider } from './sentinel/SentinelProvider';
 import { EarthEngineProvider } from './earthEngine/EarthEngineProvider';
 import { WaybackProvider } from './wayback/WaybackProvider';
+import { MaxarOpenDataProvider } from './maxar/MaxarOpenDataProvider';
 
 /**
  * Composition root for imagery sources. Adding a provider (Maxar, Planet,
@@ -16,6 +17,7 @@ export function createDefaultRegistry(): ProviderRegistry {
     .register(createLandsatProvider())
     .register(createSentinelProvider())
     .register(new WaybackProvider())
+    .register(new MaxarOpenDataProvider())
     .register(new EarthEngineProvider());
 }
 

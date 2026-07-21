@@ -33,10 +33,12 @@ export const ENDPOINTS = {
   nominatim: env.VITE_NOMINATIM ?? 'https://nominatim.openstreetmap.org',
 
   /**
-   * Optional TiTiler instance for rendering Cloud-Optimized GeoTIFFs as map
-   * tiles. Leave empty to fall back to provider browse previews.
+   * TiTiler instance for rendering Cloud-Optimized GeoTIFFs as map tiles
+   * (Maxar Open Data, Sentinel-2 full-res). Defaults to the public
+   * developmentseed demo instance — fine for light non-commercial use;
+   * point at a self-hosted TiTiler for heavier traffic.
    */
-  titiler: env.VITE_TITILER ?? '',
+  titiler: env.VITE_TITILER ?? 'https://titiler.xyz',
 
   /**
    * Esri World Imagery Wayback release index — public JSON listing all
