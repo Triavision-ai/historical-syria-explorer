@@ -133,16 +133,12 @@ export function ExplorerMap() {
               ⇔
             </div>
           </div>
-          {/* Corner labels */}
-          <span className="pointer-events-none absolute top-20 left-3 z-10 rounded bg-surface-950/75 px-2 py-1 text-xs font-medium text-amber-hl">
-            {selectedScene
-              ? `${selectedScene.mission} · ${formatCaptureDate(selectedScene.captureDate)}`
-              : 'Historical'}
+          {/* Corner labels — below the stacked mobile header so they stay visible. */}
+          <span className="pointer-events-none absolute top-36 left-3 z-10 rounded-lg border border-amber-hl/40 bg-surface-950/85 px-2.5 py-1.5 text-xs font-semibold text-amber-hl sm:top-20">
+            ◀ {selectedScene ? formatCaptureDate(selectedScene.captureDate) : 'Historical'}
           </span>
-          <span className="pointer-events-none absolute top-20 right-3 z-10 rounded bg-surface-950/75 px-2 py-1 text-xs font-medium text-accent-400">
-            {compareRightScene
-              ? `${compareRightScene.mission} · ${formatCaptureDate(compareRightScene.captureDate)}`
-              : 'Current'}
+          <span className="pointer-events-none absolute top-36 right-3 z-10 rounded-lg border border-accent-400/40 bg-surface-950/85 px-2.5 py-1.5 text-xs font-semibold text-accent-400 sm:top-20">
+            {compareRightScene ? formatCaptureDate(compareRightScene.captureDate) : 'Today'} ▶
           </span>
         </>
       )}
