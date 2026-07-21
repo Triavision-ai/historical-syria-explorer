@@ -49,6 +49,8 @@ interface ExplorerState {
   setCompareMode: (enabled: boolean) => void;
   setActivePanel: (panel: SidePanel) => void;
   setCompareRight: (scene: ImageScene | null) => Promise<void>;
+  /** One-tap: best oldest sharp scene on the left vs today's imagery. */
+  quickCompare: () => Promise<void>;
 }
 
 let searchAbort: AbortController | null = null;
@@ -168,6 +170,21 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
   setOverlayOpacity: (opacity) => set({ overlayOpacity: clamp01(opacity) }),
   setCompareMode: (enabled) => set({ compareMode: enabled }),
   setActivePanel: (panel) => set({ activePanel: panel }),
+
+  quickCompare: async () => {
+    const { scenes, selectScene, setCompareRight } = get();
+    // Prefer the oldest scene that renders as a sharp tile pyramid; fall
+    // back to the oldest scene with any displayable preview.
+    const displayable = scenes.filter(
+      (scene) => scene.metadata['displayable'] === true || scene.previewUrl,
+    );
+    if (displayable.length === 0) return;
+    const sharp = displayable.filter((scene) => scene.metadata['displayable'] === true);
+    const left = (sharp.length > 0 ? sharp : displayable)[0] ?? null;
+    await setCompareRight(null);
+    set({ compareMode: true, activePanel: null });
+    await selectScene(left);
+  },
 
   setCompareRight: async (scene) => {
     if (!scene) {

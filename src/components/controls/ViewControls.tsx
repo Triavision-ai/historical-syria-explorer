@@ -9,6 +9,7 @@ const OPACITY_STEPS = 100;
  */
 export function ViewControls() {
   const sceneLayer = useExplorerStore((state) => state.sceneLayer);
+  const sceneLayerLoading = useExplorerStore((state) => state.sceneLayerLoading);
   const compareMode = useExplorerStore((state) => state.compareMode);
   const setCompareMode = useExplorerStore((state) => state.setCompareMode);
   const overlayOpacity = useExplorerStore((state) => state.overlayOpacity);
@@ -17,7 +18,15 @@ export function ViewControls() {
   const compareRightScene = useExplorerStore((state) => state.compareRightScene);
   const setCompareRight = useExplorerStore((state) => state.setCompareRight);
 
-  if (!sceneLayer) return null;
+  if (sceneLayerLoading) {
+    return (
+      <div className="pointer-events-auto flex items-center gap-2 rounded-xl border border-surface-600 bg-surface-900/90 px-3 py-2 text-xs text-accent-400 shadow-lg backdrop-blur">
+        <span className="h-3 w-3 animate-spin rounded-full border-2 border-surface-600 border-t-accent-400" />
+        Loading imagery…
+      </div>
+    );
+  }
+  if (!sceneLayer) return <QuickCompareButton />;
 
   return (
     <div className="pointer-events-auto flex items-center gap-3 rounded-xl border border-surface-600 bg-surface-900/90 px-3 py-2 shadow-lg backdrop-blur">
@@ -69,5 +78,27 @@ export function ViewControls() {
         ✕ Clear
       </button>
     </div>
+  );
+}
+
+/**
+ * One-tap entry into comparison: oldest sharp scene vs today. Shown when no
+ * overlay is active yet, so comparing never requires digging in the list.
+ */
+function QuickCompareButton() {
+  const scenes = useExplorerStore((state) => state.scenes);
+  const searchStatus = useExplorerStore((state) => state.searchStatus);
+  const quickCompare = useExplorerStore((state) => state.quickCompare);
+
+  if (searchStatus !== 'done' || scenes.length === 0) return null;
+
+  return (
+    <button
+      type="button"
+      onClick={() => void quickCompare()}
+      className="pointer-events-auto rounded-xl border border-accent-400/50 bg-surface-900/90 px-4 py-2 text-sm font-semibold text-accent-400 shadow-lg backdrop-blur transition-colors hover:bg-surface-700"
+    >
+      ⇆ Then / Now
+    </button>
   );
 }
