@@ -76,10 +76,50 @@ if (!corners) {
   };
 }
 
+/**
+ * The scan's pixel orientation rarely matches the geographic corner order —
+ * film strips are digitized rotated or mirrored. Try every assignment of
+ * the four corners to the image corners and keep the one whose ground
+ * aspect ratio matches the pixel aspect ratio (scans have square pixels).
+ * CORNER_ORDER env (e.g. "ne,se,sw,nw") overrides for manual correction.
+ */
+function groundDistance(a, b) {
+  const kmPerDegLat = 111.32;
+  const kmPerDegLon = kmPerDegLat * Math.cos((((a.lat + b.lat) / 2) * Math.PI) / 180);
+  return Math.hypot((a.lon - b.lon) * kmPerDegLon, (a.lat - b.lat) * kmPerDegLat);
+}
+
+const clockwise = ['nw', 'ne', 'se', 'sw'];
+const mirrored = ['nw', 'sw', 'se', 'ne'];
+const rotate = (arr, n) => arr.map((_, i) => arr[(i + n) % arr.length]);
+const candidates = [];
+for (let n = 0; n < 4; n++) candidates.push(rotate(clockwise, n), rotate(mirrored, n));
+
+let assignment;
+if (process.env.CORNER_ORDER) {
+  assignment = process.env.CORNER_ORDER.split(',').map((c) => c.trim().toLowerCase());
+} else {
+  let bestScore = Infinity;
+  for (const candidate of candidates) {
+    const top = groundDistance(corners[candidate[0]], corners[candidate[1]]);
+    const left = groundDistance(corners[candidate[0]], corners[candidate[3]]);
+    const score = Math.abs(Math.log(top / left / (width / height)));
+    console.error(
+      `order ${candidate.join(',')}: top ${top.toFixed(1)}km left ${left.toFixed(1)}km score ${score.toFixed(3)}`,
+    );
+    if (score < bestScore) {
+      bestScore = score;
+      assignment = candidate;
+    }
+  }
+  console.error(`chosen corner order: ${assignment.join(',')}`);
+}
+
+const [c0, c1, c2, c3] = assignment.map((key) => corners[key]);
 const gcps = [
-  `-gcp 0 0 ${corners.nw.lon} ${corners.nw.lat}`,
-  `-gcp ${width} 0 ${corners.ne.lon} ${corners.ne.lat}`,
-  `-gcp ${width} ${height} ${corners.se.lon} ${corners.se.lat}`,
-  `-gcp 0 ${height} ${corners.sw.lon} ${corners.sw.lat}`,
+  `-gcp 0 0 ${c0.lon} ${c0.lat}`,
+  `-gcp ${width} 0 ${c1.lon} ${c1.lat}`,
+  `-gcp ${width} ${height} ${c2.lon} ${c2.lat}`,
+  `-gcp 0 ${height} ${c3.lon} ${c3.lat}`,
 ];
 console.log(gcps.join(' '));

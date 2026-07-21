@@ -25,6 +25,10 @@ on:
         description: 'Maximum tile zoom (15 ≈ 5 m/px, 16 doubles size)'
         required: false
         default: '15'
+      corner_order:
+        description: 'Manual corner order override, e.g. "ne,se,sw,nw" (blank = auto)'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -77,6 +81,7 @@ jobs:
         env:
           USGS_M2M_USERNAME: ${{ secrets.USGS_M2M_USERNAME }}
           USGS_M2M_TOKEN: ${{ secrets.USGS_M2M_TOKEN }}
+          CORNER_ORDER: ${{ inputs.corner_order }}
         run: |
           set -e
           TIF="${{ steps.extract.outputs.tif }}"
