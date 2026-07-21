@@ -29,11 +29,26 @@ const TOKEN = process.env.USGS_M2M_TOKEN;
 /** Syria-wide bounding box (must stay in sync with SYRIA_BBOX in src/config). */
 const SYRIA = { west: 35.6, south: 32.3, east: 42.4, north: 37.4 };
 
-const DATASETS = [
-  { name: 'declassi', mission: 'CORONA / ARGON / LANYARD', resolution: 2.7 },
-  { name: 'declassii', mission: 'KH-7 GAMBIT / KH-9 HEXAGON', resolution: 0.6 },
-  { name: 'declassiii', mission: 'KH-9 HEXAGON mapping camera', resolution: 6 },
+/**
+ * Dataset aliases are discovered at runtime via the dataset-search endpoint
+ * (hardcoded aliases proved wrong: DATASET_INVALID). These patterns map the
+ * discovered datasets to mission labels and typical ground resolutions.
+ */
+const DATASET_INFO = [
+  { pattern: /declass.*1|declassi$/i, mission: 'CORONA / ARGON / LANYARD', resolution: 2.7 },
+  { pattern: /declass.*2|declassii$/i, mission: 'KH-7 GAMBIT / KH-9 HEXAGON', resolution: 0.6 },
+  { pattern: /declass.*3|declassiii$/i, mission: 'KH-9 HEXAGON mapping camera', resolution: 6 },
 ];
+
+function infoFor(alias, collectionName) {
+  const haystack = `${alias} ${collectionName}`;
+  return (
+    DATASET_INFO.find(({ pattern }) => pattern.test(haystack)) ?? {
+      mission: 'Declassified reconnaissance',
+      resolution: undefined,
+    }
+  );
+}
 
 const PAGE_SIZE = 1000;
 const OUTPUT = join(
@@ -140,10 +155,35 @@ async function harvestDataset({ name, mission, resolution }) {
 console.log('Logging in to USGS M2M…');
 sessionToken = await m2m('login-token', { username: USERNAME, token: TOKEN });
 
+console.log('Discovering declassified datasets…');
+const found = await m2m('dataset-search', { datasetName: 'declass' });
+const datasets = (Array.isArray(found) ? found : [])
+  .map((d) => ({
+    name: d.datasetAlias,
+    collectionName: d.collectionName ?? '',
+  }))
+  .filter((d) => typeof d.name === 'string' && /declass/i.test(`${d.name} ${d.collectionName}`));
+
+if (datasets.length === 0) {
+  console.error('No declassified datasets visible to this account.');
+  console.error(
+    'Full dataset-search response for debugging:',
+    JSON.stringify(found)?.slice(0, 2000),
+  );
+  process.exit(1);
+}
+console.log(`Found: ${datasets.map((d) => `${d.name} (${d.collectionName})`).join(', ')}`);
+
 const allScenes = [];
-for (const dataset of DATASETS) {
+for (const dataset of datasets) {
+  const { mission, resolution } = infoFor(dataset.name, dataset.collectionName);
   console.log(`Harvesting ${dataset.name} over Syria…`);
-  allScenes.push(...(await harvestDataset(dataset)));
+  try {
+    allScenes.push(...(await harvestDataset({ name: dataset.name, mission, resolution })));
+  } catch (error) {
+    // One failing dataset must not sink the whole harvest.
+    console.error(`Skipping ${dataset.name}: ${error.message}`);
+  }
 }
 
 await m2m('logout', {}).catch(() => undefined);
