@@ -43,7 +43,7 @@ jobs:
           node-version: 22
 
       - name: Install GDAL
-        run: sudo apt-get update -q && sudo apt-get install -y -q gdal-bin unzip
+        run: sudo apt-get update -q && sudo apt-get install -y -q gdal-bin python3-gdal unzip
 
       - name: Download product from USGS
         id: download
@@ -86,7 +86,7 @@ jobs:
           gdal_translate -of GTiff -a_srs EPSG:4326 $GCPS "$TIF" /tmp/gcp.tif
           gdalwarp -t_srs EPSG:3857 -r bilinear -order 1 -dstalpha \
             -co COMPRESS=JPEG -co TILED=YES /tmp/gcp.tif /tmp/warped.tif
-          gdal2tiles --xyz -z "8-${{ inputs.max_zoom }}" -w none --processes=4 /tmp/warped.tif /tmp/tiles
+          gdal2tiles.py --xyz -z "8-${{ inputs.max_zoom }}" -w none --processes=4 /tmp/warped.tif /tmp/tiles
           rm -rf "public/tiles/${{ inputs.entity_id }}"
           mkdir -p public/tiles
           mv /tmp/tiles "public/tiles/${{ inputs.entity_id }}"
