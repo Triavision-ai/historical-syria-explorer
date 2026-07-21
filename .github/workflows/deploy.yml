@@ -18,7 +18,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # Always build the branch tip: harvest workflows dispatch this right
+      # after pushing data commits, and the dispatch snapshot can lag.
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - uses: pnpm/action-setup@v4
         with:
