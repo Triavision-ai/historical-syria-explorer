@@ -147,7 +147,16 @@ export class USGSProvider implements ImageryProvider {
     const harvested = await loadHarvestedCatalog();
     const harvestedIds = new Set(harvested.map((scene) => scene.id));
     const seeds = DECLASS_SCENES.filter((scene) => !harvestedIds.has(scene.id));
-    return [...harvested, ...seeds].filter((scene) => {
+    // Scenes processed into local full-resolution tiles are first-class:
+    // mark them so the UI and year matching can prefer them outright.
+    const tiled = await loadTilesManifest();
+    const withFlags = [...harvested, ...seeds].map((scene) => {
+      const entityId = scene.id.replace(`${this.id}:`, '');
+      return tiled[entityId]
+        ? { ...scene, metadata: { ...scene.metadata, tiled: true, displayable: true } }
+        : scene;
+    });
+    return withFlags.filter((scene) => {
       if (query.dateFrom && scene.captureDate < query.dateFrom) return false;
       if (query.dateTo && scene.captureDate > query.dateTo) return false;
       switch (query.spatial.kind) {

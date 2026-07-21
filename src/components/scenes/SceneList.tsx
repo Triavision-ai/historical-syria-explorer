@@ -116,6 +116,11 @@ function SceneRow({
             {cloudCoverOf(scene) !== null ? ` · ☁ ${Math.round(cloudCoverOf(scene) ?? 0)}%` : ''}
           </p>
         </div>
+        {scene.metadata['tiled'] === true && (
+          <span className="shrink-0 rounded-full bg-amber-hl/20 px-2 py-0.5 text-[10px] font-bold text-amber-hl">
+            HD
+          </span>
+        )}
         <span
           className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
             PROVIDER_BADGE_STYLES[scene.provider] ?? 'bg-surface-700 text-gray-300'

@@ -210,6 +210,21 @@ export function closestSceneToYear(
   year: number,
   toleranceYears: number,
 ): ImageScene | null {
+  // A scene with local full-resolution tiles beats everything else within
+  // the tolerance window — sharpness matters more than a closer-but-mushy
+  // date (a 1962 wide-film preview must not outrank sharp 1966 film).
+  let bestTiled: ImageScene | null = null;
+  let bestTiledDistance = Infinity;
+  for (const scene of scenes) {
+    if (scene.metadata['tiled'] !== true || !scene.captureDate) continue;
+    const distance = yearDistance(scene.captureDate, year);
+    if (distance <= toleranceYears && distance < bestTiledDistance) {
+      bestTiled = scene;
+      bestTiledDistance = distance;
+    }
+  }
+  if (bestTiled) return bestTiled;
+
   let best: ImageScene | null = null;
   let bestDistance = Infinity;
   for (const scene of scenes) {
