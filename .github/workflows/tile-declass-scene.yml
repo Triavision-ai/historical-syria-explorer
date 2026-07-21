@@ -105,6 +105,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          sleep 15  # let the pushed commit become the branch tip before dispatching
           curl -sS -X POST \
             -H "Authorization: Bearer $GH_TOKEN" \
             -H "Accept: application/vnd.github+json" \
