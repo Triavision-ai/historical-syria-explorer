@@ -25,6 +25,8 @@ export function ExplorerMap() {
   const selectedScene = useExplorerStore((state) => state.selectedScene);
   const overlayOpacity = useExplorerStore((state) => state.overlayOpacity);
   const compareMode = useExplorerStore((state) => state.compareMode);
+  const compareRightScene = useExplorerStore((state) => state.compareRightScene);
+  const compareRightLayer = useExplorerStore((state) => state.compareRightLayer);
   const comparing = compareMode && sceneLayer !== null;
 
   // Fly to a newly chosen location.
@@ -51,6 +53,12 @@ export function ExplorerMap() {
     if (!mainMap || !compareMap) return;
     return syncMaps(mainMap, compareMap);
   }, [mainMap, compareMap]);
+
+  // Right side of the compare: another scene, or the current-day basemap.
+  useEffect(() => {
+    if (!compareMap) return;
+    setSceneOverlay(compareMap, compareRightLayer, 1);
+  }, [compareMap, compareRightLayer]);
 
   // Map canvases live in absolutely-positioned wrappers; when compare mode
   // toggles their effective size stays the same, but a resize keeps MapLibre
@@ -132,7 +140,9 @@ export function ExplorerMap() {
               : 'Historical'}
           </span>
           <span className="pointer-events-none absolute top-20 right-3 z-10 rounded bg-surface-950/75 px-2 py-1 text-xs font-medium text-accent-400">
-            Current
+            {compareRightScene
+              ? `${compareRightScene.mission} · ${formatCaptureDate(compareRightScene.captureDate)}`
+              : 'Current'}
           </span>
         </>
       )}

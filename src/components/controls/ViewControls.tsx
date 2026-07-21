@@ -1,4 +1,5 @@
 import { useExplorerStore } from '@/hooks/useExplorerStore';
+import { formatCaptureDate } from '@/utils/date';
 
 const OPACITY_STEPS = 100;
 
@@ -13,6 +14,8 @@ export function ViewControls() {
   const overlayOpacity = useExplorerStore((state) => state.overlayOpacity);
   const setOverlayOpacity = useExplorerStore((state) => state.setOverlayOpacity);
   const selectScene = useExplorerStore((state) => state.selectScene);
+  const compareRightScene = useExplorerStore((state) => state.compareRightScene);
+  const setCompareRight = useExplorerStore((state) => state.setCompareRight);
 
   if (!sceneLayer) return null;
 
@@ -30,6 +33,17 @@ export function ViewControls() {
       >
         Compare
       </button>
+
+      {compareMode && compareRightScene && (
+        <button
+          type="button"
+          onClick={() => void setCompareRight(null)}
+          className="rounded-lg bg-surface-700 px-2 py-1.5 text-xs text-gray-300 hover:bg-surface-600"
+          title="Reset right side to current imagery"
+        >
+          Right: {formatCaptureDate(compareRightScene.captureDate)} ✕
+        </button>
+      )}
 
       {!compareMode && (
         <label className="flex items-center gap-2 text-xs text-gray-400">

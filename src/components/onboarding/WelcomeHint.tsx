@@ -33,8 +33,8 @@ export function WelcomeHint() {
         <li className="flex gap-2">
           <span className="font-bold text-accent-400">3.</span>
           <span>
-            Tap <strong>Compare</strong> to swipe between then and now, or blend with the opacity
-            slider.
+            Tap <strong>Compare</strong> to swipe between then and now — or tap <strong>⇄</strong>{' '}
+            on any scene to put it on the right side and compare two dates.
           </span>
         </li>
       </ol>

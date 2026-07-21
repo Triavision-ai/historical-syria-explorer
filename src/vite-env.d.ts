@@ -9,6 +9,7 @@ interface ImportMetaEnv {
   readonly VITE_NOMINATIM?: string;
   readonly VITE_TITILER?: string;
   readonly VITE_CORS_IMAGE_PROXY?: string;
+  readonly VITE_WAYBACK_CONFIG?: string;
   readonly VITE_USGS_M2M_USERNAME?: string;
   readonly VITE_USGS_M2M_TOKEN?: string;
   readonly VITE_EE_CLIENT_ID?: string;

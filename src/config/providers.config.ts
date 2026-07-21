@@ -39,6 +39,14 @@ export const ENDPOINTS = {
   titiler: env.VITE_TITILER ?? '',
 
   /**
+   * Esri World Imagery Wayback release index — public JSON listing all
+   * dated snapshots of the high-res imagery basemap (2014–present).
+   */
+  waybackConfig:
+    env.VITE_WAYBACK_CONFIG ??
+    'https://s3-us-west-2.amazonaws.com/config.maptiles.arcgis.com/waybackconfig.json',
+
+  /**
    * CORS image proxy (wsrv.nl, a free public image CDN). WebGL map textures
    * require CORS headers that some archives (ims.cr.usgs.gov) do not send;
    * previews from such hosts are routed through this proxy for on-map

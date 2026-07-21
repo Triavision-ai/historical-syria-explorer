@@ -7,6 +7,7 @@ const PROVIDER_BADGE_STYLES: Record<string, string> = {
   'usgs-declass': 'bg-amber-hl/15 text-amber-hl',
   landsat: 'bg-emerald-400/15 text-emerald-300',
   sentinel2: 'bg-accent-400/15 text-accent-400',
+  'esri-wayback': 'bg-fuchsia-400/15 text-fuchsia-300',
 };
 
 /** Chronological list of every scene found for the current location. */
@@ -16,6 +17,8 @@ export function SceneList() {
   const searchStatus = useExplorerStore((state) => state.searchStatus);
   const selectedScene = useExplorerStore((state) => state.selectedScene);
   const selectScene = useExplorerStore((state) => state.selectScene);
+  const setCompareRight = useExplorerStore((state) => state.setCompareRight);
+  const compareRightScene = useExplorerStore((state) => state.compareRightScene);
   const locationName = useExplorerStore((state) => state.locationName);
 
   const failures = outcomes.filter((outcome) => outcome.error);
@@ -50,7 +53,9 @@ export function SceneList() {
               key={scene.id}
               scene={scene}
               selected={scene.id === selectedScene?.id}
+              isCompareRight={scene.id === compareRightScene?.id}
               onSelect={() => void selectScene(scene)}
+              onCompareRight={() => void setCompareRight(scene)}
             />
           ))}
         </ul>
@@ -67,18 +72,22 @@ export function SceneList() {
 function SceneRow({
   scene,
   selected,
+  isCompareRight,
   onSelect,
+  onCompareRight,
 }: {
   scene: ImageScene;
   selected: boolean;
+  isCompareRight: boolean;
   onSelect: () => void;
+  onCompareRight: () => void;
 }) {
   return (
-    <li className="border-b border-surface-700/60">
+    <li className="relative border-b border-surface-700/60">
       <button
         type="button"
         onClick={onSelect}
-        className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors ${
+        className={`flex w-full items-center gap-3 py-2.5 pr-12 pl-4 text-left transition-colors ${
           selected ? 'bg-surface-700/70' : 'hover:bg-surface-800'
         }`}
       >
@@ -111,8 +120,22 @@ function SceneRow({
             PROVIDER_BADGE_STYLES[scene.provider] ?? 'bg-surface-700 text-gray-300'
           }`}
         >
-          {scene.provider.replace('-declass', '')}
+          {scene.provider.replace('-declass', '').replace('esri-', '')}
         </span>
+      </button>
+      {/* Put this scene on the RIGHT side of the compare slider. */}
+      <button
+        type="button"
+        onClick={onCompareRight}
+        aria-label={`Compare against ${formatCaptureDate(scene.captureDate)}`}
+        title="Use as right side of compare"
+        className={`absolute top-1/2 right-2 -translate-y-1/2 rounded-md px-2 py-1.5 text-sm transition-colors ${
+          isCompareRight
+            ? 'bg-accent-500 text-surface-950'
+            : 'text-gray-500 hover:bg-surface-700 hover:text-accent-400'
+        }`}
+      >
+        ⇄
       </button>
     </li>
   );

@@ -37,6 +37,10 @@ interface ExplorerState {
   compareMode: boolean;
   activePanel: SidePanel;
 
+  /** Scene shown on the RIGHT side of compare; null = current-day basemap. */
+  compareRightScene: ImageScene | null;
+  compareRightLayer: SceneLayer | null;
+
   goTo: (name: string, center: GeoPoint, zoom?: number) => void;
   searchScenesAt: (center: GeoPoint) => Promise<void>;
   selectScene: (scene: ImageScene | null) => Promise<void>;
@@ -44,6 +48,7 @@ interface ExplorerState {
   setOverlayOpacity: (opacity: number) => void;
   setCompareMode: (enabled: boolean) => void;
   setActivePanel: (panel: SidePanel) => void;
+  setCompareRight: (scene: ImageScene | null) => Promise<void>;
 }
 
 let searchAbort: AbortController | null = null;
@@ -66,6 +71,8 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
   overlayOpacity: 1,
   compareMode: false,
   activePanel: null,
+  compareRightScene: null,
+  compareRightLayer: null,
 
   goTo: (name, center, zoom) => {
     set((state) => ({
@@ -135,6 +142,23 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
   setOverlayOpacity: (opacity) => set({ overlayOpacity: clamp01(opacity) }),
   setCompareMode: (enabled) => set({ compareMode: enabled }),
   setActivePanel: (panel) => set({ activePanel: panel }),
+
+  setCompareRight: async (scene) => {
+    if (!scene) {
+      set({ compareRightScene: null, compareRightLayer: null });
+      return;
+    }
+    set({ compareRightScene: scene, compareRightLayer: null, compareMode: true });
+    try {
+      const layer = await providerRegistry.get(scene.provider).load(scene);
+      if (get().compareRightScene?.id === scene.id) {
+        set({ compareRightLayer: layer });
+        if (layer && isNarrowViewport()) set({ activePanel: null });
+      }
+    } catch (error) {
+      console.error(`Failed to load compare scene ${scene.id}`, error);
+    }
+  },
 }));
 
 /** Pick the scene whose capture date is nearest to the target year. */
@@ -152,11 +176,14 @@ export function closestSceneToYear(
     // record), clear skies (full overcast costs up to two "years"), and
     // frames whose preview is actually legible at the current location: a
     // browse image stretched over a huge film footprint (e.g. KH-9 mapping
-    // frames spanning >2°) is mush at city zoom, so it costs extra.
-    const displayPenalty = scene.previewUrl ? 0 : 0.9;
+    // frames spanning >2°) is mush at city zoom, so it costs extra. Scenes
+    // served as real tile pyramids (metadata.displayable) are sharp at any
+    // zoom and skip both penalties.
+    const tiled = scene.metadata['displayable'] === true;
+    const displayPenalty = tiled || scene.previewUrl ? 0 : 0.9;
     const cloudPenalty = ((cloudCoverOf(scene) ?? 0) / 100) * 2;
     const span = Math.max(scene.bounds[2] - scene.bounds[0], scene.bounds[3] - scene.bounds[1]);
-    const hugeFramePenalty = span > 2 ? 1.5 : 0;
+    const hugeFramePenalty = !tiled && span > 2 ? 1.5 : 0;
     const score = distance + displayPenalty + cloudPenalty + hugeFramePenalty;
     if (score < bestDistance && distance <= toleranceYears) {
       best = scene;
