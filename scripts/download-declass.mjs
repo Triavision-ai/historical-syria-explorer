@@ -23,23 +23,42 @@ if (!entityId || !datasetName || !outDir) {
   process.exit(1);
 }
 
-let sessionToken = null;
-async function m2m(endpoint, body) {
-  const response = await fetch(`${M2M_URL}/${endpoint}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(sessionToken ? { 'X-Auth-Token': sessionToken } : {}),
-    },
-    body: JSON.stringify(body),
-  });
-  const payload = await response.json();
-  if (payload.errorCode)
-    throw new Error(`${endpoint}: ${payload.errorCode} ${payload.errorMessage}`);
-  return payload.data;
-}
-
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+let sessionToken = null;
+/** M2M call with retries — the API intermittently returns HTML error pages. */
+async function m2m(endpoint, body) {
+  const attempts = 4;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    const response = await fetch(`${M2M_URL}/${endpoint}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(sessionToken ? { 'X-Auth-Token': sessionToken } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+    const text = await response.text();
+    let payload;
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      const excerpt = text.slice(0, 300).replace(/\s+/g, ' ');
+      console.error(
+        `M2M ${endpoint}: HTTP ${response.status}, non-JSON body (attempt ${attempt}/${attempts}): ${excerpt}`,
+      );
+      if (attempt < attempts) {
+        await sleep(8000 * attempt);
+        continue;
+      }
+      throw new Error(`${endpoint}: non-JSON response, HTTP ${response.status}`);
+    }
+    if (payload.errorCode)
+      throw new Error(`${endpoint}: ${payload.errorCode} ${payload.errorMessage}`);
+    return payload.data;
+  }
+  throw new Error(`${endpoint}: unreachable`);
+}
 
 console.log('Logging in…');
 sessionToken = await m2m('login-token', {
