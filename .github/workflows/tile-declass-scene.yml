@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       entity_id:
-        description: 'Scene entity id (e.g. DZB00402700090H020001)'
+        description: 'Candidate scene entity ids, comma-separated (first digitized one wins)'
         required: true
         default: 'DZB00402700090H020001'
       dataset:
@@ -51,8 +51,10 @@ jobs:
           USGS_M2M_USERNAME: ${{ secrets.USGS_M2M_USERNAME }}
           USGS_M2M_TOKEN: ${{ secrets.USGS_M2M_TOKEN }}
         run: |
-          FILE=$(node scripts/download-declass.mjs "${{ inputs.entity_id }}" "${{ inputs.dataset }}" /tmp/dl | tail -1)
-          echo "file=$FILE" >> "$GITHUB_OUTPUT"
+          OUT=$(node scripts/download-declass.mjs "${{ inputs.entity_id }}" "${{ inputs.dataset }}" /tmp/dl)
+          echo "$OUT"
+          echo "file=$(echo "$OUT" | tail -1)" >> "$GITHUB_OUTPUT"
+          echo "entity=$(echo "$OUT" | grep '^CHOSEN:' | tail -1 | cut -d: -f2)" >> "$GITHUB_OUTPUT"
           ls -lh /tmp/dl
 
       - name: Extract archive if needed
@@ -81,24 +83,24 @@ jobs:
           SIZE=$(gdalinfo "$TIF" | grep 'Size is' | sed 's/Size is //;s/,//')
           W=$(echo "$SIZE" | cut -d' ' -f1)
           H=$(echo "$SIZE" | cut -d' ' -f2)
-          GCPS=$(node scripts/print-gcps.mjs "${{ inputs.entity_id }}" "${{ inputs.dataset }}" "$W" "$H" | tail -1)
+          GCPS=$(node scripts/print-gcps.mjs "${{ steps.download.outputs.entity }}" "${{ inputs.dataset }}" "$W" "$H" | tail -1)
           echo "GCPs: $GCPS"
           gdal_translate -of GTiff -a_srs EPSG:4326 $GCPS "$TIF" /tmp/gcp.tif
           gdalwarp -t_srs EPSG:3857 -r bilinear -order 1 -dstalpha \
             -co COMPRESS=JPEG -co TILED=YES /tmp/gcp.tif /tmp/warped.tif
           gdal2tiles.py --xyz -z "8-${{ inputs.max_zoom }}" -w none --processes=4 /tmp/warped.tif /tmp/tiles
-          rm -rf "public/tiles/${{ inputs.entity_id }}"
+          rm -rf "public/tiles/${{ steps.download.outputs.entity }}"
           mkdir -p public/tiles
-          mv /tmp/tiles "public/tiles/${{ inputs.entity_id }}"
-          node scripts/update-tiles-manifest.mjs "${{ inputs.entity_id }}" 8 "${{ inputs.max_zoom }}"
-          du -sh "public/tiles/${{ inputs.entity_id }}"
+          mv /tmp/tiles "public/tiles/${{ steps.download.outputs.entity }}"
+          node scripts/update-tiles-manifest.mjs "${{ steps.download.outputs.entity }}" 8 "${{ inputs.max_zoom }}"
+          du -sh "public/tiles/${{ steps.download.outputs.entity }}"
 
       - name: Commit tiles
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add public/tiles
-          git commit -m "data: full-resolution tiles for ${{ inputs.entity_id }}"
+          git commit -m "data: full-resolution tiles for ${{ steps.download.outputs.entity }}"
           git push
 
       - name: Trigger Pages deploy

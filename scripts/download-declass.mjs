@@ -17,11 +17,16 @@ import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
 const M2M_URL = process.env.USGS_M2M_URL ?? 'https://m2m.cr.usgs.gov/api/api/json/stable';
-const [entityId, datasetName, outDir] = process.argv.slice(2);
-if (!entityId || !datasetName || !outDir) {
-  console.error('Usage: download-declass.mjs <entityId> <datasetName> <outDir>');
+const [entityArg, datasetName, outDir] = process.argv.slice(2);
+if (!entityArg || !datasetName || !outDir) {
+  console.error('Usage: download-declass.mjs <entityId[,entityId2,…]> <datasetName> <outDir>');
   process.exit(1);
 }
+/** Candidate scenes, tried in order — many film frames were never scanned. */
+const candidates = entityArg
+  .split(',')
+  .map((value) => value.trim())
+  .filter(Boolean);
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -66,17 +71,29 @@ sessionToken = await m2m('login-token', {
   token: process.env.USGS_M2M_TOKEN,
 });
 
-console.log(`Fetching download options for ${entityId}…`);
-const options = await m2m('download-options', { datasetName, entityIds: entityId });
-const available = (options ?? []).filter((option) => option.available);
-if (available.length === 0) {
-  console.error('No downloadable product. Options were:', JSON.stringify(options)?.slice(0, 1500));
-  console.error('The scene may not be digitized yet - it must be ordered once via EarthExplorer.');
+let entityId = null;
+let product = null;
+for (const candidate of candidates) {
+  console.log(`Fetching download options for ${candidate}…`);
+  const options = await m2m('download-options', { datasetName, entityIds: candidate });
+  const available = (options ?? []).filter((option) => option.available);
+  if (available.length === 0) {
+    console.log(`${candidate}: not digitized (no downloadable product), trying next candidate…`);
+    continue;
+  }
+  // Prefer the largest product (the full-resolution scan).
+  available.sort((a, b) => (b.filesize ?? 0) - (a.filesize ?? 0));
+  entityId = candidate;
+  product = available[0];
+  break;
+}
+if (!product) {
+  console.error(
+    'None of the candidate scenes are digitized. They must be ordered once via EarthExplorer ' +
+      '(scan-on-demand), or pick different frames.',
+  );
   process.exit(2);
 }
-// Prefer the largest product (the full-resolution scan).
-available.sort((a, b) => (b.filesize ?? 0) - (a.filesize ?? 0));
-const product = available[0];
 console.log(
   `Product: ${product.productName ?? product.productId} (${Math.round((product.filesize ?? 0) / 1e6)} MB)`,
 );
@@ -116,4 +133,5 @@ const outPath = join(outDir, filename);
 await pipeline(Readable.fromWeb(response.body), createWriteStream(outPath));
 await m2m('logout', {}).catch(() => undefined);
 console.log(`Saved ${outPath}`);
+console.log(`CHOSEN:${entityId}`);
 console.log(outPath);
