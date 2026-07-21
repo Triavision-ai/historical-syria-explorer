@@ -13,6 +13,7 @@ import { M2MClient } from './m2mClient';
 import type { M2MSceneResult } from './m2mClient';
 import { DECLASS_SCENES, USGS_DECLASS_PROVIDER_ID } from './declassCatalog';
 import { loadHarvestedCatalog } from './catalogLoader';
+import { loadTilesManifest, tileUrlTemplate } from './tilesManifest';
 
 /** M2M dataset names for the declassified collections. */
 const DECLASS_DATASETS = ['declassi', 'declassii', 'declassiii'];
@@ -97,6 +98,22 @@ export class USGSProvider implements ImageryProvider {
    * harvesting) stay metadata-only with EarthExplorer ordering links.
    */
   async load(scene: ImageScene): Promise<SceneLayer | null> {
+    // Scenes processed by the tile-declass-scene workflow have sharp local
+    // tiles — always prefer those over the low-res browse preview.
+    const entityId = scene.id.replace(`${this.id}:`, '');
+    const tiled = (await loadTilesManifest())[entityId];
+    if (tiled) {
+      return {
+        kind: 'raster-tiles',
+        urlTemplate: tileUrlTemplate(entityId),
+        tileSize: 256,
+        bounds: tiled.bounds,
+        minZoom: tiled.minZoom,
+        maxZoom: tiled.maxZoom,
+        attribution: 'U.S. Geological Survey, declassified national imagery',
+      };
+    }
+
     if (!scene.previewUrl) return null;
     const [w, s, e, n] = scene.bounds;
     return {

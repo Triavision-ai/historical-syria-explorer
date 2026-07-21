@@ -16,6 +16,8 @@ export function setSceneOverlay(map: MapLibreMap, layer: SceneLayer | null, opac
       tiles: [layer.urlTemplate],
       tileSize: layer.tileSize,
       bounds: [...layer.bounds],
+      ...(layer.minZoom !== undefined ? { minzoom: layer.minZoom } : {}),
+      ...(layer.maxZoom !== undefined ? { maxzoom: layer.maxZoom } : {}),
       ...(layer.attribution ? { attribution: layer.attribution } : {}),
     });
   } else {
