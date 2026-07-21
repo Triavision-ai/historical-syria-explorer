@@ -16,6 +16,21 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // After a deploy, a cached index.html can reference purged hashed
+      // assets, leaving a blank page. Reload once with a fresh fetch.
+      window.addEventListener(
+        'error',
+        (event) => {
+          const tag = event.target && event.target.tagName;
+          if ((tag === 'SCRIPT' || tag === 'LINK') && !sessionStorage.getItem('hse-reloaded')) {
+            sessionStorage.setItem('hse-reloaded', '1');
+            location.reload();
+          }
+        },
+        true,
+      );
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
