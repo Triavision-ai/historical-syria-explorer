@@ -70,14 +70,61 @@ export class StacImageryProvider implements ImageryProvider {
   }
 
   async search(query: SceneSearchQuery, signal?: AbortSignal): Promise<ImageScene[]> {
-    const body = buildStacSearchBody(query, this.config.collections, {
-      defaultLimit: DEFAULT_SEARCH_LIMIT,
-      ...(this.config.cloudCoverField ? { cloudCoverField: this.config.cloudCoverField } : {}),
-    });
-    const items = await this.client.search(body, signal);
-    return items
-      .map((item) => this.toScene(item))
-      .filter((scene): scene is ImageScene => scene !== null);
+    // An undated query with a plain limit would return only the oldest
+    // scenes (results sort by date), leaving decades unrepresented. Sample
+    // the archive in buckets instead so every era shows up on the timeline.
+    const queries = !query.dateFrom && !query.dateTo ? this.temporalBuckets(query) : [query];
+    const perQuery = Math.max(4, Math.ceil((query.limit ?? DEFAULT_SEARCH_LIMIT) / queries.length));
+
+    const settled = await Promise.allSettled(
+      queries.map((subQuery) => {
+        const body = buildStacSearchBody(
+          { ...subQuery, limit: perQuery },
+          this.config.collections,
+          {
+            defaultLimit: DEFAULT_SEARCH_LIMIT,
+            ...(this.config.cloudCoverField
+              ? { cloudCoverField: this.config.cloudCoverField }
+              : {}),
+          },
+        );
+        return this.client.search(body, signal);
+      }),
+    );
+
+    const seen = new Set<string>();
+    const scenes: ImageScene[] = [];
+    for (const result of settled) {
+      if (result.status !== 'fulfilled') continue;
+      for (const item of result.value) {
+        const scene = this.toScene(item);
+        if (scene && !seen.has(scene.id)) {
+          seen.add(scene.id);
+          scenes.push(scene);
+        }
+      }
+    }
+    return scenes;
+  }
+
+  /** Split the provider's temporal range into 5-year sub-queries. */
+  private temporalBuckets(query: SceneSearchQuery): SceneSearchQuery[] {
+    const BUCKET_YEARS = 5;
+    const from = this.config.temporalRange.from;
+    const to =
+      this.config.temporalRange.to === 'present'
+        ? new Date().getUTCFullYear() + 1
+        : this.config.temporalRange.to;
+    const buckets: SceneSearchQuery[] = [];
+    for (let start = from; start < to; start += BUCKET_YEARS) {
+      const end = Math.min(start + BUCKET_YEARS, to);
+      buckets.push({
+        ...query,
+        dateFrom: `${start}-01-01T00:00:00Z`,
+        dateTo: `${end}-01-01T00:00:00Z`,
+      });
+    }
+    return buckets;
   }
 
   async load(scene: ImageScene, _signal?: AbortSignal): Promise<SceneLayer | null> {

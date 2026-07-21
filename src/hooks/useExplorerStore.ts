@@ -134,8 +134,34 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
 
   selectYear: async (year) => {
     set({ activeYear: year });
-    const { scenes, selectScene } = get();
-    const best = closestSceneToYear(scenes, year, TIMELINE_MATCH_TOLERANCE_YEARS);
+    const { scenes, center, selectScene } = get();
+    let best = closestSceneToYear(scenes, year, TIMELINE_MATCH_TOLERANCE_YEARS);
+
+    // If nothing lands close to the requested year, run a targeted search
+    // for that year window instead of settling for a distant match.
+    const CLOSE_ENOUGH_YEARS = 1.5;
+    const REFINE_WINDOW_YEARS = 3;
+    if (!best || yearDistance(best.captureDate, year) > CLOSE_ENOUGH_YEARS) {
+      try {
+        const result = await sceneSearchService.search({
+          spatial: { kind: 'bbox', bbox: bboxAroundPoint(center, SEARCH_BBOX_DELTA) },
+          dateFrom: `${year - REFINE_WINDOW_YEARS}-01-01T00:00:00Z`,
+          dateTo: `${year + REFINE_WINDOW_YEARS}-12-31T23:59:59Z`,
+          maxCloudCover: DEFAULT_MAX_CLOUD_COVER,
+        });
+        if (result.scenes.length > 0) {
+          const known = new Set(get().scenes.map((scene) => scene.id));
+          const merged = [
+            ...get().scenes,
+            ...result.scenes.filter((scene) => !known.has(scene.id)),
+          ].sort((a, b) => a.captureDate.localeCompare(b.captureDate));
+          set({ scenes: merged });
+          best = closestSceneToYear(merged, year, TIMELINE_MATCH_TOLERANCE_YEARS);
+        }
+      } catch (error) {
+        console.error(`Targeted search for ${year} failed`, error);
+      }
+    }
     await selectScene(best);
   },
 
