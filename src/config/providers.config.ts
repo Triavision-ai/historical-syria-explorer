@@ -37,7 +37,29 @@ export const ENDPOINTS = {
    * tiles. Leave empty to fall back to provider browse previews.
    */
   titiler: env.VITE_TITILER ?? '',
+
+  /**
+   * CORS image proxy (wsrv.nl, a free public image CDN). WebGL map textures
+   * require CORS headers that some archives (ims.cr.usgs.gov) do not send;
+   * previews from such hosts are routed through this proxy for on-map
+   * display only. Set empty to disable.
+   */
+  corsImageProxy: env.VITE_CORS_IMAGE_PROXY ?? 'https://wsrv.nl/?url=',
 } as const;
+
+/** Hosts that lack CORS headers and need the image proxy for map display. */
+const CORS_PROXY_HOSTS = new Set(['ims.cr.usgs.gov']);
+
+/** Wrap an image URL with the CORS proxy when its host requires it. */
+export function corsSafeImageUrl(url: string): string {
+  if (!ENDPOINTS.corsImageProxy) return url;
+  try {
+    if (!CORS_PROXY_HOSTS.has(new URL(url).host)) return url;
+  } catch {
+    return url;
+  }
+  return `${ENDPOINTS.corsImageProxy}${encodeURIComponent(url)}`;
+}
 
 /** Credentials are only ever read from env — never hardcoded, never committed. */
 export const CREDENTIALS = {

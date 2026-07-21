@@ -7,7 +7,7 @@ import type {
   SceneSearchQuery,
 } from '@/types';
 import { bboxContains, bboxIntersects, geometryBounds } from '@/utils/bbox';
-import { ENDPOINTS, CREDENTIALS } from '@/config/providers.config';
+import { ENDPOINTS, CREDENTIALS, corsSafeImageUrl } from '@/config/providers.config';
 import { SYRIA_BBOX } from '@/config/app.config';
 import { M2MClient } from './m2mClient';
 import type { M2MSceneResult } from './m2mClient';
@@ -101,7 +101,8 @@ export class USGSProvider implements ImageryProvider {
     const [w, s, e, n] = scene.bounds;
     return {
       kind: 'georeferenced-image',
-      url: scene.previewUrl,
+      // ims.cr.usgs.gov sends no CORS headers; WebGL textures need them.
+      url: corsSafeImageUrl(scene.previewUrl),
       coordinates: [
         [w, n],
         [e, n],

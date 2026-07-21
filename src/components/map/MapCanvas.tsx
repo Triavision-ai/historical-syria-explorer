@@ -46,6 +46,9 @@ export function MapCanvas({
       attributionControl: { compact: true },
     });
     map.touchZoomRotate.enable();
+    // Surface tile/texture load failures (e.g. CORS-blocked overlay images)
+    // instead of failing silently.
+    map.on('error', (event) => console.warn('[map]', event.error?.message ?? event.error));
     if (withNavControl) {
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
     }
