@@ -87,6 +87,7 @@ jobs:
           echo "Found $COUNT film segment(s)"
 
       - name: Georeference and tile
+        id: georef
         env:
           USGS_M2M_USERNAME: ${{ secrets.USGS_M2M_USERNAME }}
           USGS_M2M_TOKEN: ${{ secrets.USGS_M2M_TOKEN }}
@@ -128,6 +129,13 @@ jobs:
           echo "warped bounds: $BOUNDS"
           node scripts/update-tiles-manifest.mjs "${{ steps.download.outputs.entity }}" 8 "$ZMAX" r2 $BOUNDS
           node scripts/update-corners-registry.mjs "${{ steps.download.outputs.entity }}" "$CORNERS" "$ORDER"
+          # Persist values for the commit step's regenerate-on-conflict retries.
+          {
+            echo "zmax=$ZMAX"
+            echo "bounds=$BOUNDS"
+            echo "order=$ORDER"
+            echo "corners=$CORNERS"
+          } >> "$GITHUB_OUTPUT"
           du -sh /tmp/tiles
 
       - name: Upload tiles to R2
@@ -160,16 +168,24 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # Old in-repo pyramid for this scene is superseded by R2.
-          git rm -r -q --ignore-unmatch "public/tiles/${{ steps.download.outputs.entity }}"
-          git add public/tiles/index.json public/tiles/corners.json
-          git commit -m "data: R2 full-resolution tiles for ${{ steps.download.outputs.entity }}"
-          for attempt in 1 2 3 4; do
-            if git push; then break; fi
-            echo "push rejected, rebasing (attempt $attempt)"
-            git pull --rebase origin main
-            sleep 5
+          # Concurrent runs each rewrite the shared registry JSONs, so a
+          # rebase merge can never succeed. Instead: on every attempt, reset
+          # to the latest main and REGENERATE this scene's entries on top.
+          for attempt in 1 2 3 4 5 6; do
+            git fetch -q origin main
+            git reset -q --hard origin/main
+            node scripts/update-tiles-manifest.mjs "${{ steps.download.outputs.entity }}" 8 "${{ steps.georef.outputs.zmax }}" r2 ${{ steps.georef.outputs.bounds }}
+            node scripts/update-corners-registry.mjs "${{ steps.download.outputs.entity }}" '${{ steps.georef.outputs.corners }}' "${{ steps.georef.outputs.order }}"
+            # Old in-repo pyramid for this scene is superseded by R2.
+            git rm -r -q --ignore-unmatch "public/tiles/${{ steps.download.outputs.entity }}"
+            git add public/tiles/index.json public/tiles/corners.json
+            git commit -q -m "data: R2 full-resolution tiles for ${{ steps.download.outputs.entity }}" \
+              || { echo "registry already up to date"; exit 0; }
+            if git push; then exit 0; fi
+            echo "push lost the race, regenerating on latest main (attempt $attempt)"
+            sleep $((RANDOM % 17 + 3))
           done
+          echo "could not push after 6 attempts"; exit 1
 
       - name: Trigger Pages deploy
         env:
