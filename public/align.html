@@ -39,6 +39,7 @@
       <select id="scene"></select>
       <div class="row">
         <button id="move" class="secondary">✋ Move</button>
+        <button id="sharpen" class="secondary">🔍 Sharpen here</button>
         <button id="reset" class="secondary">Reset</button>
         <button id="copy">Copy alignment code</button>
       </div>
@@ -87,11 +88,11 @@
         return `${base}/${z}/${x}/${y}.png`;
       }
 
-      /** Stitch the scene's tiles into one canvas image (≤ ~2048 px wide). */
-      async function buildSnapshot(id, entry) {
-        const [w, s, e, n] = entry.bounds;
+      /** Stitch the scene's tiles over [w,s,e,n] into one canvas (≤ maxPx wide). */
+      async function buildSnapshot(id, entry, bounds, maxPx = 2048) {
+        const [w, s, e, n] = bounds;
         let z = entry.maxZoom;
-        while (z > entry.minZoom && (lon2x(e, z) - lon2x(w, z)) * 256 > 2048) z--;
+        while (z > entry.minZoom && (lon2x(e, z) - lon2x(w, z)) * 256 > maxPx) z--;
         const x0 = Math.floor(lon2x(w, z)), x1 = Math.floor(lon2x(e, z));
         const y0 = Math.floor(lat2y(n, z)), y1 = Math.floor(lat2y(s, z));
         const canvas = document.createElement('canvas');
@@ -127,9 +128,20 @@
         });
       }
 
+      /** Map a displayed (transformed) point back to the untransformed frame. */
+      function inverse([lon, lat]) {
+        const [cx, cy] = state.center;
+        const kLat = 111320, kLon = kLat * Math.cos((cy * Math.PI) / 180);
+        const x = (lon - state.dx - cx) * kLon, y = (lat - state.dy - cy) * kLat;
+        const cos = Math.cos(-state.theta), sin = Math.sin(-state.theta);
+        const xr = (x * cos - y * sin) / state.scale, yr = (x * sin + y * cos) / state.scale;
+        return [cx + xr / kLon, cy + yr / kLat];
+      }
+
       function refresh() {
         if (!state.baseQuad) return;
         map.getSource('old')?.setCoordinates(transformed(state.baseQuad));
+        if (state.patchQuad) map.getSource('patch')?.setCoordinates(transformed(state.patchQuad));
         const q = transformed(state.boundsQuad).map((c) => c.map((v) => Number(v.toFixed(6))));
         $('out').value = JSON.stringify({
           scene: state.sceneId,
@@ -143,21 +155,50 @@
 
       async function selectScene(id) {
         state.sceneId = id; state.entry = state.manifest[id];
-        state.dx = state.dy = state.theta = 0; state.scale = 1;
+        state.dx = state.dy = state.theta = 0; state.scale = 1; state.patchQuad = null;
         $('rot').value = 0; $('scl').value = 1000; $('rotv').textContent = '0.0°'; $('sclv').textContent = '100.0%';
         $('status').textContent = 'Building scene snapshot…';
         const [w, s, e, n] = state.entry.bounds;
         state.center = [(w + e) / 2, (s + n) / 2];
         state.boundsQuad = [[w, n], [e, n], [e, s], [w, s]];
         map.fitBounds([[w, s], [e, n]], { padding: 40, duration: 0 });
-        const snap = await buildSnapshot(id, state.entry);
+        const snap = await buildSnapshot(id, state.entry, state.entry.bounds);
         state.baseQuad = snap.quad;
-        if (map.getLayer('old')) map.removeLayer('old');
-        if (map.getSource('old')) map.removeSource('old');
+        for (const layer of ['old', 'patch']) {
+          if (map.getLayer(layer)) map.removeLayer(layer);
+          if (map.getSource(layer)) map.removeSource(layer);
+        }
         map.addSource('old', { type: 'image', url: snap.url, coordinates: snap.quad });
         map.addLayer({ id: 'old', type: 'raster', source: 'old',
           paint: { 'raster-opacity': Number($('opacity').value) / 100, 'raster-fade-duration': 0 } });
-        $('status').textContent = 'Drag with Move, fine-tune with sliders.';
+        $('status').textContent = 'Drag with Move; zoom in and press 🔍 for full detail.';
+        refresh();
+      }
+
+      /** Re-fetch full-detail tiles for the current view (keeps the transform). */
+      async function sharpenHere() {
+        if (!state.entry) return;
+        $('status').textContent = 'Fetching full-detail tiles for this view…';
+        const view = map.getBounds();
+        // Map the viewport back into the untransformed frame and clamp to it.
+        const pts = [
+          inverse([view.getWest(), view.getNorth()]), inverse([view.getEast(), view.getNorth()]),
+          inverse([view.getEast(), view.getSouth()]), inverse([view.getWest(), view.getSouth()]),
+        ];
+        const [bw, bs, be, bn] = state.entry.bounds;
+        const w = Math.max(bw, Math.min(...pts.map((p) => p[0])));
+        const e = Math.min(be, Math.max(...pts.map((p) => p[0])));
+        const s = Math.max(bs, Math.min(...pts.map((p) => p[1])));
+        const n = Math.min(bn, Math.max(...pts.map((p) => p[1])));
+        if (!(w < e && s < n)) { $('status').textContent = 'The scene is not in view.'; return; }
+        const snap = await buildSnapshot(state.sceneId, state.entry, [w, s, e, n], 2048);
+        state.patchQuad = snap.quad;
+        if (map.getLayer('patch')) map.removeLayer('patch');
+        if (map.getSource('patch')) map.removeSource('patch');
+        map.addSource('patch', { type: 'image', url: snap.url, coordinates: transformed(snap.quad) });
+        map.addLayer({ id: 'patch', type: 'raster', source: 'patch',
+          paint: { 'raster-opacity': Number($('opacity').value) / 100, 'raster-fade-duration': 0 } });
+        $('status').textContent = 'Sharp view loaded — align, then 🔍 again after big moves.';
         refresh();
       }
 
@@ -184,7 +225,12 @@
 
       $('rot').oninput = (e) => { state.theta = (Number(e.target.value) / 10) * (Math.PI / 180); $('rotv').textContent = (Number(e.target.value) / 10).toFixed(1) + '°'; refresh(); };
       $('scl').oninput = (e) => { state.scale = Number(e.target.value) / 1000; $('sclv').textContent = (state.scale * 100).toFixed(1) + '%'; refresh(); };
-      $('opacity').oninput = (e) => { $('opv').textContent = e.target.value + '%'; if (map.getLayer('old')) map.setPaintProperty('old', 'raster-opacity', Number(e.target.value) / 100); };
+      $('opacity').oninput = (e) => {
+        $('opv').textContent = e.target.value + '%';
+        for (const layer of ['old', 'patch'])
+          if (map.getLayer(layer)) map.setPaintProperty(layer, 'raster-opacity', Number(e.target.value) / 100);
+      };
+      $('sharpen').onclick = sharpenHere;
       $('reset').onclick = () => selectScene(state.sceneId);
       $('copy').onclick = async () => {
         await navigator.clipboard.writeText($('out').value).catch(() => $('out').select());
