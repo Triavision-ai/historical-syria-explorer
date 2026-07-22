@@ -1,0 +1,23 @@
+name: Find digitized declass frames
+
+on:
+  workflow_dispatch:
+    inputs:
+      places:
+        description: 'Space-separated "Name:lon:lat" entries'
+        required: true
+        default: 'Homs:36.7137:34.7308 DeirEzZor:40.1408:35.3359 Aleppo:37.1612:36.2021 Latakia:35.7822:35.5196 Raqqa:39.0079:35.9528 Idlib:36.6318:35.9306 Damascus:36.2919:33.5104'
+
+jobs:
+  scout:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Query digitized frames
+        env:
+          USGS_M2M_USERNAME: ${{ secrets.USGS_M2M_USERNAME }}
+          USGS_M2M_TOKEN: ${{ secrets.USGS_M2M_TOKEN }}
+        run: node scripts/find-digitized.mjs ${{ inputs.places }}
