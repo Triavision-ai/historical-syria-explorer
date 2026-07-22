@@ -95,14 +95,29 @@ jobs:
           VRT=$(echo "$PREP" | grep '^VRT:' | cut -d: -f2-)
           GCPS=$(echo "$PREP" | grep '^GCPS:' | cut -d: -f2-)
           gdal_translate -of VRT -a_srs EPSG:4326 $GCPS "$VRT" /tmp/gcp.vrt
-          TR=$(python3 -c "print(156543.03 / 2 ** ${{ inputs.max_zoom }})")
+          # Never sample beyond the film's native ground resolution: cap the
+          # requested zoom at the scan's real detail (no upsampling, no loss).
+          NATIVE=$(python3 -c "
+          import json, subprocess, math
+          d = json.loads(subprocess.run(['gdalinfo','-json','/tmp/gcp.vrt'], capture_output=True, text=True).stdout)
+          gcps = d['gcps']['gcpList']
+          w = max(g['pixel'] for g in gcps); h = max(g['line'] for g in gcps)
+          at = lambda p, l: next(g for g in gcps if g['pixel'] == p and g['line'] == l)
+          def dist(a, b):
+              kx = 111320 * math.cos(math.radians((a['y'] + b['y']) / 2))
+              return math.hypot((a['x'] - b['x']) * kx, (a['y'] - b['y']) * 111320)
+          print(max(dist(at(0,0), at(w,0)) / w, dist(at(0,0), at(0,h)) / h))
+          ")
+          ZMAX=$(python3 -c "import math; print(min(${{ inputs.max_zoom }}, math.floor(math.log2(156543.03 / $NATIVE))))")
+          TR=$(python3 -c "print(156543.03 / 2 ** $ZMAX)")
+          echo "native ground resolution: ${NATIVE} m/px -> tiling to z${ZMAX} (${TR} m/px)"
           gdalwarp -t_srs EPSG:3857 -r bilinear -order 1 -dstalpha -tr "$TR" "$TR" \
-            -co COMPRESS=JPEG -co TILED=YES --config GDAL_CACHEMAX 2048 \
+            -co COMPRESS=JPEG -co TILED=YES -co BIGTIFF=YES --config GDAL_CACHEMAX 2048 \
             /tmp/gcp.vrt /tmp/warped.tif
-          gdal2tiles.py --xyz -z "8-${{ inputs.max_zoom }}" -w none --processes=4 /tmp/warped.tif /tmp/tiles
+          gdal2tiles.py --xyz -z "8-${ZMAX}" -w none --processes=4 /tmp/warped.tif /tmp/tiles
           BOUNDS=$(python3 -c "import json,subprocess;d=json.loads(subprocess.run(['gdalinfo','-json','/tmp/warped.tif'],capture_output=True,text=True).stdout);c=d['wgs84Extent']['coordinates'][0];xs=[p[0] for p in c];ys=[p[1] for p in c];print(min(xs),min(ys),max(xs),max(ys))")
           echo "warped bounds: $BOUNDS"
-          node scripts/update-tiles-manifest.mjs "${{ steps.download.outputs.entity }}" 8 "${{ inputs.max_zoom }}" r2 $BOUNDS
+          node scripts/update-tiles-manifest.mjs "${{ steps.download.outputs.entity }}" 8 "$ZMAX" r2 $BOUNDS
           du -sh /tmp/tiles
 
       - name: Upload tiles to R2
