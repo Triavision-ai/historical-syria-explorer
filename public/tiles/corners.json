@@ -1,6 +1,6 @@
 {
   "DZB00402700090H020001": {
-    "note": "Hama 1966 KH-7 — by-eye alignment by Ahmad (align tool, 2026-07-22): scan is mirrored; mirror + rotate -118deg + scale 1.071 applied to the previous landmark calibration",
+    "note": "Hama 1966 KH-7 - by-eye alignment by Ahmad (align tool, 2026-07-22): scan is mirrored; mirror + rotate -118deg + scale 1.071 applied to the previous landmark calibration",
     "order": [
       "se",
       "ne",
@@ -49,6 +49,110 @@
       "sw": [
         38.21,
         36.078
+      ]
+    }
+  },
+  "DZB1205-500082L008001": {
+    "order": [
+      "nw",
+      "sw",
+      "se",
+      "ne"
+    ],
+    "corners": {
+      "nw": [
+        39.623,
+        36.525
+      ],
+      "ne": [
+        40.907,
+        36.394
+      ],
+      "se": [
+        40.577,
+        34.33
+      ],
+      "sw": [
+        39.324,
+        34.455
+      ]
+    }
+  },
+  "DZB1210-500023L001001": {
+    "order": [
+      "sw",
+      "se",
+      "ne",
+      "nw"
+    ],
+    "corners": {
+      "nw": [
+        35.936,
+        35.968
+      ],
+      "ne": [
+        37.248,
+        35.822
+      ],
+      "se": [
+        36.886,
+        33.697
+      ],
+      "sw": [
+        35.604,
+        33.836
+      ]
+    }
+  },
+  "DZB1206-500016L011001": {
+    "order": [
+      "se",
+      "ne",
+      "nw",
+      "sw"
+    ],
+    "corners": {
+      "nw": [
+        35.705,
+        36.805
+      ],
+      "ne": [
+        37.013,
+        36.662
+      ],
+      "se": [
+        36.65,
+        34.567
+      ],
+      "sw": [
+        35.375,
+        34.706
+      ]
+    }
+  },
+  "DZB1206-500074L008001": {
+    "order": [
+      "se",
+      "sw",
+      "nw",
+      "ne"
+    ],
+    "corners": {
+      "nw": [
+        37.087,
+        36.83
+      ],
+      "ne": [
+        38.405,
+        36.687
+      ],
+      "se": [
+        38.039,
+        34.576
+      ],
+      "sw": [
+        36.755,
+        34.716
       ]
     }
   }
