@@ -49,6 +49,13 @@ export const ENDPOINTS = {
     'https://s3-us-west-2.amazonaws.com/config.maptiles.arcgis.com/waybackconfig.json',
 
   /**
+   * Public base URL for full-resolution scene tiles hosted on object
+   * storage (Cloudflare R2). Scenes marked storage:"r2" in the tiles
+   * manifest stream from here.
+   */
+  tilesBase: env.VITE_TILES_BASE ?? 'https://pub-f8ac6c500eea43b28591b7b636fc9e3d.r2.dev',
+
+  /**
    * CORS image proxy (wsrv.nl, a free public image CDN). WebGL map textures
    * require CORS headers that some archives (ims.cr.usgs.gov) do not send;
    * previews from such hosts are routed through this proxy for on-map

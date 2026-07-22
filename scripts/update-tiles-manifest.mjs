@@ -8,7 +8,7 @@
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 
-const [entityId, minZoomArg, maxZoomArg, ...boundsArgs] = process.argv.slice(2);
+const [entityId, minZoomArg, maxZoomArg, storageArg, ...boundsArgs] = process.argv.slice(2);
 const minZoom = Number(minZoomArg ?? 8);
 const maxZoom = Number(maxZoomArg ?? 15);
 const explicitBounds = boundsArgs.length === 4 ? boundsArgs.map(Number) : null;
@@ -27,7 +27,12 @@ try {
 } catch {
   // First tiled scene.
 }
-manifest[entityId] = { bounds: explicitBounds ?? scene.bounds, minZoom, maxZoom };
+manifest[entityId] = {
+  bounds: explicitBounds ?? scene.bounds,
+  minZoom,
+  maxZoom,
+  storage: storageArg === 'repo' ? 'repo' : 'r2',
+};
 await mkdir('public/tiles', { recursive: true });
 await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
 console.log(`Manifest updated: ${entityId} z${minZoom}-${maxZoom}`);

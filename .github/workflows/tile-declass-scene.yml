@@ -100,20 +100,35 @@ jobs:
             -co COMPRESS=JPEG -co TILED=YES --config GDAL_CACHEMAX 2048 \
             /tmp/gcp.vrt /tmp/warped.tif
           gdal2tiles.py --xyz -z "8-${{ inputs.max_zoom }}" -w none --processes=4 /tmp/warped.tif /tmp/tiles
-          rm -rf "public/tiles/${{ steps.download.outputs.entity }}"
-          mkdir -p public/tiles
-          mv /tmp/tiles "public/tiles/${{ steps.download.outputs.entity }}"
           BOUNDS=$(python3 -c "import json,subprocess;d=json.loads(subprocess.run(['gdalinfo','-json','/tmp/warped.tif'],capture_output=True,text=True).stdout);c=d['wgs84Extent']['coordinates'][0];xs=[p[0] for p in c];ys=[p[1] for p in c];print(min(xs),min(ys),max(xs),max(ys))")
           echo "warped bounds: $BOUNDS"
-          node scripts/update-tiles-manifest.mjs "${{ steps.download.outputs.entity }}" 8 "${{ inputs.max_zoom }}" $BOUNDS
-          du -sh "public/tiles/${{ steps.download.outputs.entity }}"
+          node scripts/update-tiles-manifest.mjs "${{ steps.download.outputs.entity }}" 8 "${{ inputs.max_zoom }}" r2 $BOUNDS
+          du -sh /tmp/tiles
 
-      - name: Commit tiles
+      - name: Upload tiles to R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+        run: |
+          ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          # Browsers need CORS to use tiles as WebGL textures; idempotent.
+          aws s3api put-bucket-cors --bucket syria-tiles --endpoint-url "$ENDPOINT" \
+            --cors-configuration '{"CORSRules":[{"AllowedOrigins":["*"],"AllowedMethods":["GET","HEAD"],"AllowedHeaders":["*"],"MaxAgeSeconds":86400}]}' || true
+          aws s3 sync /tmp/tiles "s3://syria-tiles/tiles/${{ steps.download.outputs.entity }}" \
+            --endpoint-url "$ENDPOINT" --no-progress --only-show-errors \
+            --cache-control "public, max-age=31536000, immutable"
+          echo "Uploaded $(find /tmp/tiles -name '*.png' | wc -l) tiles"
+
+      - name: Commit manifest
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/tiles
-          git commit -m "data: full-resolution tiles for ${{ steps.download.outputs.entity }}"
+          # Old in-repo pyramid for this scene is superseded by R2.
+          git rm -r -q --ignore-unmatch "public/tiles/${{ steps.download.outputs.entity }}"
+          git add public/tiles/index.json
+          git commit -m "data: R2 full-resolution tiles for ${{ steps.download.outputs.entity }}"
           for attempt in 1 2 3 4; do
             if git push; then break; fi
             echo "push rejected, rebasing (attempt $attempt)"

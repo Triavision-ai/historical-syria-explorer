@@ -105,7 +105,7 @@ export class USGSProvider implements ImageryProvider {
     if (tiled) {
       return {
         kind: 'raster-tiles',
-        urlTemplate: tileUrlTemplate(entityId),
+        urlTemplate: tileUrlTemplate(entityId, tiled),
         tileSize: 256,
         bounds: tiled.bounds,
         minZoom: tiled.minZoom,
