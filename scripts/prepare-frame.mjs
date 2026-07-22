@@ -91,7 +91,13 @@ try {
   console.error(`scene-metadata unavailable (${error.message}); using catalog bounds`);
 }
 if (process.env.CORNERS_JSON) {
-  corners = JSON.parse(process.env.CORNERS_JSON);
+  const raw = JSON.parse(process.env.CORNERS_JSON);
+  corners = Object.fromEntries(
+    Object.entries(raw).map(([key, value]) => [
+      key,
+      Array.isArray(value) ? { lon: value[0], lat: value[1] } : value,
+    ]),
+  );
   console.error('using CORNERS_JSON override');
 }
 if (!corners) {
