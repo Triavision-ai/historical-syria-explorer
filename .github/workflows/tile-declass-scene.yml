@@ -108,7 +108,8 @@ jobs:
               return math.hypot((a['x'] - b['x']) * kx, (a['y'] - b['y']) * 111320)
           print(max(dist(at(0,0), at(w,0)) / w, dist(at(0,0), at(0,h)) / h))
           ")
-          ZMAX=$(python3 -c "import math; print(min(${{ inputs.max_zoom }}, math.floor(math.log2(156543.03 / $NATIVE))))")
+          # ceil: the first zoom level at least as fine as the film itself.
+          ZMAX=$(python3 -c "import math; print(min(${{ inputs.max_zoom }}, math.ceil(math.log2(156543.03 / $NATIVE))))")
           TR=$(python3 -c "print(156543.03 / 2 ** $ZMAX)")
           echo "native ground resolution: ${NATIVE} m/px -> tiling to z${ZMAX} (${TR} m/px)"
           gdalwarp -t_srs EPSG:3857 -r bilinear -order 1 -dstalpha -tr "$TR" "$TR" \
