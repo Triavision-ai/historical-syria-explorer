@@ -29,6 +29,10 @@ on:
         description: 'Manual corner order override, e.g. "ne,se,sw,nw" (blank = auto)'
         required: false
         default: ''
+      corners_json:
+        description: 'Corner coordinate override JSON {"nw":[lon,lat],...} (blank = archive metadata)'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -83,6 +87,7 @@ jobs:
           USGS_M2M_USERNAME: ${{ secrets.USGS_M2M_USERNAME }}
           USGS_M2M_TOKEN: ${{ secrets.USGS_M2M_TOKEN }}
           CORNER_ORDER: ${{ inputs.corner_order }}
+          CORNERS_JSON: ${{ inputs.corners_json }}
         run: |
           set -e
           PREP=$(node scripts/prepare-frame.mjs "${{ steps.download.outputs.entity }}" "${{ inputs.dataset }}" /tmp/extracted)
@@ -98,7 +103,9 @@ jobs:
           rm -rf "public/tiles/${{ steps.download.outputs.entity }}"
           mkdir -p public/tiles
           mv /tmp/tiles "public/tiles/${{ steps.download.outputs.entity }}"
-          node scripts/update-tiles-manifest.mjs "${{ steps.download.outputs.entity }}" 8 "${{ inputs.max_zoom }}"
+          BOUNDS=$(python3 -c "import json,subprocess;d=json.loads(subprocess.run(['gdalinfo','-json','/tmp/warped.tif'],capture_output=True,text=True).stdout);c=d['wgs84Extent']['coordinates'][0];xs=[p[0] for p in c];ys=[p[1] for p in c];print(min(xs),min(ys),max(xs),max(ys))")
+          echo "warped bounds: $BOUNDS"
+          node scripts/update-tiles-manifest.mjs "${{ steps.download.outputs.entity }}" 8 "${{ inputs.max_zoom }}" $BOUNDS
           du -sh "public/tiles/${{ steps.download.outputs.entity }}"
 
       - name: Commit tiles

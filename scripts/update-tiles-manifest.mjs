@@ -8,9 +8,10 @@
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 
-const [entityId, minZoomArg, maxZoomArg] = process.argv.slice(2);
+const [entityId, minZoomArg, maxZoomArg, ...boundsArgs] = process.argv.slice(2);
 const minZoom = Number(minZoomArg ?? 8);
 const maxZoom = Number(maxZoomArg ?? 15);
+const explicitBounds = boundsArgs.length === 4 ? boundsArgs.map(Number) : null;
 
 const catalog = JSON.parse(await readFile('public/catalog/declass-syria.json', 'utf8'));
 const scene = catalog.scenes.find((s) => s.entityId === entityId);
@@ -26,7 +27,7 @@ try {
 } catch {
   // First tiled scene.
 }
-manifest[entityId] = { bounds: scene.bounds, minZoom, maxZoom };
+manifest[entityId] = { bounds: explicitBounds ?? scene.bounds, minZoom, maxZoom };
 await mkdir('public/tiles', { recursive: true });
 await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
 console.log(`Manifest updated: ${entityId} z${minZoom}-${maxZoom}`);

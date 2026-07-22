@@ -90,6 +90,10 @@ try {
 } catch (error) {
   console.error(`scene-metadata unavailable (${error.message}); using catalog bounds`);
 }
+if (process.env.CORNERS_JSON) {
+  corners = JSON.parse(process.env.CORNERS_JSON);
+  console.error('using CORNERS_JSON override');
+}
 if (!corners) {
   const catalog = JSON.parse(await readFile('public/catalog/declass-syria.json', 'utf8'));
   const scene = catalog.scenes.find((s) => s.entityId === entityId);
