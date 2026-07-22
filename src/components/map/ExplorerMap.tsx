@@ -54,6 +54,20 @@ export function ExplorerMap() {
     return syncMaps(mainMap, compareMap);
   }, [mainMap, compareMap]);
 
+  // Follow the user's panning: when the map settles somewhere new, refresh
+  // the scene list for that area (no search box needed to explore).
+  useEffect(() => {
+    if (!mainMap) return;
+    const onMoveEnd = () => {
+      const c = mainMap.getCenter();
+      useExplorerStore.getState().mapMoved({ lon: c.lng, lat: c.lat });
+    };
+    mainMap.on('moveend', onMoveEnd);
+    return () => {
+      mainMap.off('moveend', onMoveEnd);
+    };
+  }, [mainMap]);
+
   // Right side of the compare: another scene, or the current-day basemap.
   useEffect(() => {
     if (!compareMap) return;

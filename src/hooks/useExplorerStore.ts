@@ -43,6 +43,8 @@ interface ExplorerState {
 
   goTo: (name: string, center: GeoPoint, zoom?: number) => void;
   searchScenesAt: (center: GeoPoint) => Promise<void>;
+  /** Map settled at a new spot — refresh the scene list if it moved enough. */
+  mapMoved: (center: GeoPoint) => void;
   selectScene: (scene: ImageScene | null) => Promise<void>;
   selectYear: (year: number) => Promise<void>;
   setOverlayOpacity: (opacity: number) => void;
@@ -54,6 +56,11 @@ interface ExplorerState {
 }
 
 let searchAbort: AbortController | null = null;
+/** Center of the last executed search — pan-follow skips small nudges. */
+let searchedCenter: GeoPoint | null = null;
+/** Re-search when the map settles more than half a search box away. */
+const PAN_RESEARCH_THRESHOLD = SEARCH_BBOX_DELTA;
+let panSearchTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const useExplorerStore = create<ExplorerState>((set, get) => ({
   locationName: DEFAULT_LOCATION.name,
@@ -86,10 +93,27 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
     void get().searchScenesAt(center);
   },
 
+  mapMoved: (center) => {
+    const previous = searchedCenter ?? get().center;
+    const moved = Math.max(
+      Math.abs(center.lon - previous.lon),
+      Math.abs(center.lat - previous.lat),
+    );
+    if (moved < PAN_RESEARCH_THRESHOLD) return;
+    // Small settle delay: panning across the country in several flicks
+    // should trigger one search at the destination, not one per flick.
+    if (panSearchTimer) clearTimeout(panSearchTimer);
+    panSearchTimer = setTimeout(() => {
+      set({ center, locationName: 'Map view' });
+      void get().searchScenesAt(center);
+    }, 600);
+  },
+
   searchScenesAt: async (center) => {
     searchAbort?.abort();
     const abort = new AbortController();
     searchAbort = abort;
+    searchedCenter = center;
     set({ searchStatus: 'loading' });
     try {
       const result = await sceneSearchService.search(
