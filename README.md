@@ -49,6 +49,14 @@ Honesty about the current state matters more than marketing:
 - The interface is currently in English. An Arabic interface is planned.
 - Very cloudy scenes appear in search results; the cloud percentage is shown for each scene.
 
+## Operator documentation
+
+Everything needed to run, maintain, and extend this project without its
+original authors — the tile store structure and its z/x/y numbering, how to
+decode scene identifiers, the registry files, and step-by-step runbooks for
+publishing and aligning new historical scenes — is documented in
+[docs/HANDBOOK.md](docs/HANDBOOK.md).
+
 ## Architecture
 
 The application is a static site (Vite, React, TypeScript, MapLibre GL JS, Tailwind CSS) with no backend of its own. Every imagery source is implemented as a plugin behind a single interface, and all external endpoints are configurable.
