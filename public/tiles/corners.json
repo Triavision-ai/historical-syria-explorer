@@ -1,12 +1,12 @@
 {
   "DZB00402700090H020001": {
-    "note": "Hama 1966 KH-7 — landmark-calibrated (citadel + airbase), ~40 m residual",
+    "note": "Hama 1966 KH-7 — by-eye alignment by Ahmad (align tool, 2026-07-22): scan is mirrored; mirror + rotate -118deg + scale 1.071 applied to the previous landmark calibration",
     "order": ["se", "ne", "nw", "sw"],
     "corners": {
-      "nw": [36.953, 35.23476],
-      "ne": [36.98349, 35.06467],
-      "se": [36.43069, 35.01413],
-      "sw": [36.41404, 35.17527]
+      "nw": [36.969379, 35.24878],
+      "ne": [36.788061, 35.357885],
+      "se": [36.45168, 34.955727],
+      "sw": [36.629609, 34.861827]
     }
   }
 }

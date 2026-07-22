@@ -33,6 +33,10 @@ on:
         description: 'Corner coordinate override JSON {"nw":[lon,lat],...} (blank = archive metadata)'
         required: false
         default: ''
+      clean_r2:
+        description: 'Delete the scene''s existing R2 tiles first (use after an alignment change)'
+        required: false
+        default: 'false'
 
 permissions:
   contents: write
@@ -139,6 +143,11 @@ jobs:
           # re-sending everything (fresh tiles always differ in mtime).
           aws configure set default.s3.max_concurrent_requests 64
           aws configure set default.s3.max_queue_size 10000
+          if [ "${{ inputs.clean_r2 }}" = "true" ]; then
+            echo "Alignment changed — removing the scene's previous tiles first"
+            aws s3 rm "s3://syria-tiles/tiles/${{ steps.download.outputs.entity }}" \
+              --recursive --endpoint-url "$ENDPOINT" --only-show-errors || true
+          fi
           aws s3 sync /tmp/tiles "s3://syria-tiles/tiles/${{ steps.download.outputs.entity }}" \
             --endpoint-url "$ENDPOINT" --no-progress --only-show-errors --size-only \
             --cache-control "public, max-age=31536000, immutable"
