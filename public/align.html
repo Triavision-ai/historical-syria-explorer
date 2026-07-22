@@ -11,168 +11,199 @@
       #map { position: absolute; inset: 0; }
       #panel {
         position: absolute; top: 8px; left: 8px; right: 8px; z-index: 10;
-        background: rgba(11, 15, 20, 0.92); border: 1px solid #1f2937; border-radius: 10px;
-        padding: 10px 12px; max-width: 430px; font-size: 13px; line-height: 1.45;
+        background: rgba(11, 15, 20, 0.94); border: 1px solid #1f2937; border-radius: 10px;
+        padding: 10px 12px; max-width: 430px; font-size: 13px; line-height: 1.4;
       }
-      select, button, input[type=range] { font-size: 13px; }
+      select, button { font-size: 13px; }
       select { width: 100%; background: #111827; color: #e5e7eb; border: 1px solid #374151; border-radius: 6px; padding: 6px; margin: 6px 0; }
       button { background: #2563eb; color: white; border: 0; border-radius: 6px; padding: 7px 10px; margin: 4px 4px 0 0; cursor: pointer; }
       button.secondary { background: #374151; }
-      button:disabled { opacity: 0.4; cursor: default; }
-      #status { margin-top: 6px; color: #fbbf24; min-height: 18px; }
-      #pairs { margin: 6px 0 0; padding-left: 18px; color: #9ca3af; }
-      textarea { width: 100%; height: 74px; background: #111827; color: #a7f3d0; border: 1px solid #374151; border-radius: 6px; font-family: monospace; font-size: 11px; margin-top: 6px; }
+      button.active { background: #f59e0b; color: #111827; }
       .row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+      .row label { width: 62px; color: #9ca3af; }
+      .row input[type=range] { flex: 1; }
+      .row output { width: 64px; text-align: right; font-variant-numeric: tabular-nums; }
+      #status { margin-top: 6px; color: #fbbf24; min-height: 16px; font-size: 12px; }
+      textarea { width: 100%; height: 64px; background: #111827; color: #a7f3d0; border: 1px solid #374151; border-radius: 6px; font-family: monospace; font-size: 11px; margin-top: 6px; }
       .hint { color: #9ca3af; font-size: 12px; }
     </style>
   </head>
   <body>
     <div id="map"></div>
     <div id="panel">
-      <b>Scene alignment — by eye</b>
+      <b>Scene alignment — move / rotate / scale by eye</b>
       <div class="hint">
-        1) Pick a scene. 2) Press <b>Add pair</b>, click a landmark <i>on the old image</i>,
-        then click the <i>same place on today's imagery</i> (overlay hides automatically).
-        3) Repeat for 2–3 landmarks spread apart. 4) Copy the code and send it in the chat.
+        Pick a scene, press <b>Move</b> and drag the old image until landmarks match today's
+        imagery. Fine-tune with the rotate and scale sliders. Then copy the code and send it in the chat.
       </div>
       <select id="scene"></select>
       <div class="row">
-        <span>Old image opacity</span>
-        <input id="opacity" type="range" min="0" max="100" value="70" style="flex:1" />
+        <button id="move" class="secondary">✋ Move</button>
+        <button id="reset" class="secondary">Reset</button>
+        <button id="copy">Copy alignment code</button>
       </div>
-      <button id="add">Add pair</button>
-      <button id="undo" class="secondary">Undo</button>
-      <button id="copy" class="secondary" disabled>Copy alignment code</button>
-      <div id="status"></div>
-      <ol id="pairs"></ol>
-      <textarea id="out" readonly placeholder="Alignment code appears here after 2 pairs"></textarea>
+      <div class="row"><label>Opacity</label><input id="opacity" type="range" min="0" max="100" value="65" /><output id="opv">65%</output></div>
+      <div class="row"><label>Rotate</label><input id="rot" type="range" min="-1800" max="1800" value="0" /><output id="rotv">0.0°</output></div>
+      <div class="row"><label>Scale</label><input id="scl" type="range" min="500" max="1500" value="1000" /><output id="sclv">100.0%</output></div>
+      <div id="status">Loading scenes…</div>
+      <textarea id="out" readonly></textarea>
     </div>
     <script>
       const TILES_BASE = 'https://pub-f8ac6c500eea43b28591b7b636fc9e3d.r2.dev';
-      const state = { manifest: {}, sceneId: null, pairs: [], picking: null, markers: [] };
+      const $ = (id) => document.getElementById(id);
+      const state = {
+        manifest: {}, sceneId: null, entry: null,
+        baseQuad: null,        // canvas image corners before user transform [tl,tr,br,bl] as [lon,lat]
+        boundsQuad: null,      // scene bounds corners before transform (for the output code)
+        center: null,          // rotation/scale pivot [lon,lat]
+        dx: 0, dy: 0, theta: 0, scale: 1,
+        moveMode: false, dragging: false, dragStart: null, dragBase: null,
+      };
 
       const map = new maplibregl.Map({
         container: 'map',
         style: {
           version: 8,
           sources: {
-            esri: {
-              type: 'raster', tileSize: 256,
+            esri: { type: 'raster', tileSize: 256,
               tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
-              attribution: 'Esri, Maxar, Earthstar Geographics',
-            },
+              attribution: 'Esri, Maxar, Earthstar Geographics' },
           },
           layers: [{ id: 'esri', type: 'raster', source: 'esri' }],
         },
         center: [36.7578, 35.1318], zoom: 12,
       });
 
-      const $ = (id) => document.getElementById(id);
+      // ---- tile math ----
+      const lon2x = (lon, z) => ((lon + 180) / 360) * 2 ** z;
+      const lat2y = (lat, z) => ((1 - Math.log(Math.tan((lat * Math.PI) / 180) + 1 / Math.cos((lat * Math.PI) / 180)) / Math.PI) / 2) * 2 ** z;
+      const x2lon = (x, z) => (x / 2 ** z) * 360 - 180;
+      const y2lat = (y, z) => (Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / 2 ** z))) * 180) / Math.PI;
 
-      async function loadManifest() {
+      function tileUrl(id, entry, z, x, y) {
+        const base = entry.storage === 'r2'
+          ? TILES_BASE + '/tiles/' + id
+          : location.origin + location.pathname.replace(/align\.html$/, '') + 'tiles/' + id;
+        return `${base}/${z}/${x}/${y}.png`;
+      }
+
+      /** Stitch the scene's tiles into one canvas image (≤ ~2048 px wide). */
+      async function buildSnapshot(id, entry) {
+        const [w, s, e, n] = entry.bounds;
+        let z = entry.maxZoom;
+        while (z > entry.minZoom && (lon2x(e, z) - lon2x(w, z)) * 256 > 2048) z--;
+        const x0 = Math.floor(lon2x(w, z)), x1 = Math.floor(lon2x(e, z));
+        const y0 = Math.floor(lat2y(n, z)), y1 = Math.floor(lat2y(s, z));
+        const canvas = document.createElement('canvas');
+        canvas.width = (x1 - x0 + 1) * 256; canvas.height = (y1 - y0 + 1) * 256;
+        const ctx = canvas.getContext('2d');
+        const jobs = [];
+        for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
+          jobs.push(new Promise((resolve) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => { ctx.drawImage(img, (x - x0) * 256, (y - y0) * 256); resolve(); };
+            img.onerror = () => resolve();
+            img.src = tileUrl(id, entry, z, x, y);
+          }));
+        }
+        await Promise.all(jobs);
+        const quad = [
+          [x2lon(x0, z), y2lat(y0, z)], [x2lon(x1 + 1, z), y2lat(y0, z)],
+          [x2lon(x1 + 1, z), y2lat(y1 + 1, z)], [x2lon(x0, z), y2lat(y1 + 1, z)],
+        ];
+        return { url: canvas.toDataURL('image/png'), quad };
+      }
+
+      // ---- geometry: similarity transform about the pivot, in local meters ----
+      function transformed(quad) {
+        const [cx, cy] = state.center;
+        const kLat = 111320, kLon = kLat * Math.cos((cy * Math.PI) / 180);
+        const cos = Math.cos(state.theta), sin = Math.sin(state.theta);
+        return quad.map(([lon, lat]) => {
+          const x = (lon - cx) * kLon, y = (lat - cy) * kLat;
+          const xr = state.scale * (x * cos - y * sin), yr = state.scale * (x * sin + y * cos);
+          return [cx + xr / kLon + state.dx, cy + yr / kLat + state.dy];
+        });
+      }
+
+      function refresh() {
+        if (!state.baseQuad) return;
+        map.getSource('old')?.setCoordinates(transformed(state.baseQuad));
+        const q = transformed(state.boundsQuad).map((c) => c.map((v) => Number(v.toFixed(6))));
+        $('out').value = JSON.stringify({
+          scene: state.sceneId,
+          move: { dLon: +state.dx.toFixed(6), dLat: +state.dy.toFixed(6) },
+          rotateDeg: +((state.theta * 180) / Math.PI).toFixed(3),
+          scale: +state.scale.toFixed(4),
+          center: state.center.map((v) => +v.toFixed(6)),
+          boundsQuad: { nw: q[0], ne: q[1], se: q[2], sw: q[3] },
+        });
+      }
+
+      async function selectScene(id) {
+        state.sceneId = id; state.entry = state.manifest[id];
+        state.dx = state.dy = state.theta = 0; state.scale = 1;
+        $('rot').value = 0; $('scl').value = 1000; $('rotv').textContent = '0.0°'; $('sclv').textContent = '100.0%';
+        $('status').textContent = 'Building scene snapshot…';
+        const [w, s, e, n] = state.entry.bounds;
+        state.center = [(w + e) / 2, (s + n) / 2];
+        state.boundsQuad = [[w, n], [e, n], [e, s], [w, s]];
+        map.fitBounds([[w, s], [e, n]], { padding: 40, duration: 0 });
+        const snap = await buildSnapshot(id, state.entry);
+        state.baseQuad = snap.quad;
+        if (map.getLayer('old')) map.removeLayer('old');
+        if (map.getSource('old')) map.removeSource('old');
+        map.addSource('old', { type: 'image', url: snap.url, coordinates: snap.quad });
+        map.addLayer({ id: 'old', type: 'raster', source: 'old',
+          paint: { 'raster-opacity': Number($('opacity').value) / 100, 'raster-fade-duration': 0 } });
+        $('status').textContent = 'Drag with Move, fine-tune with sliders.';
+        refresh();
+      }
+
+      // ---- interactions ----
+      $('move').onclick = () => {
+        state.moveMode = !state.moveMode;
+        $('move').classList.toggle('active', state.moveMode);
+        map.dragPan[state.moveMode ? 'disable' : 'enable']();
+        $('status').textContent = state.moveMode
+          ? 'Move mode ON — drag the old image. Press ✋ again to pan the map.'
+          : 'Move mode off — dragging pans the map.';
+      };
+      map.on('mousedown', (e) => { if (state.moveMode) { state.dragging = true; state.dragStart = e.lngLat; state.dragBase = [state.dx, state.dy]; } });
+      map.on('touchstart', (e) => { if (state.moveMode && e.lngLat) { state.dragging = true; state.dragStart = e.lngLat; state.dragBase = [state.dx, state.dy]; } });
+      const dragMove = (e) => {
+        if (!state.dragging || !e.lngLat) return;
+        state.dx = state.dragBase[0] + (e.lngLat.lng - state.dragStart.lng);
+        state.dy = state.dragBase[1] + (e.lngLat.lat - state.dragStart.lat);
+        refresh();
+      };
+      map.on('mousemove', dragMove); map.on('touchmove', dragMove);
+      const dragEnd = () => { state.dragging = false; };
+      map.on('mouseup', dragEnd); map.on('touchend', dragEnd);
+
+      $('rot').oninput = (e) => { state.theta = (Number(e.target.value) / 10) * (Math.PI / 180); $('rotv').textContent = (Number(e.target.value) / 10).toFixed(1) + '°'; refresh(); };
+      $('scl').oninput = (e) => { state.scale = Number(e.target.value) / 1000; $('sclv').textContent = (state.scale * 100).toFixed(1) + '%'; refresh(); };
+      $('opacity').oninput = (e) => { $('opv').textContent = e.target.value + '%'; if (map.getLayer('old')) map.setPaintProperty('old', 'raster-opacity', Number(e.target.value) / 100); };
+      $('reset').onclick = () => selectScene(state.sceneId);
+      $('copy').onclick = async () => {
+        await navigator.clipboard.writeText($('out').value).catch(() => $('out').select());
+        $('status').textContent = 'Copied! Paste the code in the chat.';
+      };
+      $('scene').onchange = (e) => selectScene(e.target.value);
+
+      map.on('load', async () => {
         const res = await fetch('tiles/index.json');
         state.manifest = res.ok ? await res.json() : {};
         const sel = $('scene');
-        sel.innerHTML = '';
         for (const id of Object.keys(state.manifest)) {
           const opt = document.createElement('option');
           opt.value = id; opt.textContent = id;
           sel.appendChild(opt);
         }
         if (sel.options.length) selectScene(sel.value);
-      }
-
-      function tileUrl(id, entry) {
-        return entry.storage === 'r2'
-          ? TILES_BASE + '/tiles/' + id + '/{z}/{x}/{y}.png'
-          : location.origin + location.pathname.replace(/align\.html$/, '') + 'tiles/' + id + '/{z}/{x}/{y}.png';
-      }
-
-      function selectScene(id) {
-        state.sceneId = id; resetPairs();
-        const entry = state.manifest[id];
-        if (map.getLayer('old')) map.removeLayer('old');
-        if (map.getSource('old')) map.removeSource('old');
-        map.addSource('old', {
-          type: 'raster', tileSize: 256, tiles: [tileUrl(id, entry)],
-          bounds: entry.bounds, minzoom: Math.max(0, entry.minZoom - 1), maxzoom: entry.maxZoom,
-        });
-        map.addLayer({ id: 'old', type: 'raster', source: 'old',
-          paint: { 'raster-opacity': Number($('opacity').value) / 100 } });
-        const [w, s, e, n] = entry.bounds;
-        map.fitBounds([[w, s], [e, n]], { padding: 40, duration: 0 });
-      }
-
-      function setOverlayOpacity(v) {
-        if (map.getLayer('old')) map.setPaintProperty('old', 'raster-opacity', v);
-      }
-
-      function resetPairs() {
-        state.pairs = []; state.picking = null;
-        state.markers.forEach((m) => m.remove()); state.markers = [];
-        render();
-      }
-
-      function render() {
-        const list = $('pairs'); list.innerHTML = '';
-        state.pairs.forEach((p, i) => {
-          const li = document.createElement('li');
-          li.textContent = 'old(' + p.from.map((x) => x.toFixed(5)) + ') → true(' +
-            (p.to ? p.to.map((x) => x.toFixed(5)) : '…click today’s imagery') + ')';
-          list.appendChild(li);
-        });
-        const complete = state.pairs.filter((p) => p.to);
-        const ready = complete.length >= 2;
-        $('copy').disabled = !ready;
-        $('out').value = ready
-          ? JSON.stringify({ scene: state.sceneId, pairs: complete })
-          : '';
-        $('status').textContent =
-          state.picking === 'from' ? 'Click the landmark ON THE OLD IMAGE' :
-          state.picking === 'to' ? 'Now click the SAME place on today’s imagery' :
-          complete.length >= 2 ? 'Ready — copy the code below and send it in the chat.' :
-          'Add at least 2 pairs (3 is better), far apart from each other.';
-      }
-
-      function addMarker(lngLat, color) {
-        const m = new maplibregl.Marker({ color }).setLngLat(lngLat).addTo(map);
-        state.markers.push(m);
-      }
-
-      map.on('click', (e) => {
-        if (!state.picking) return;
-        const c = [e.lngLat.lng, e.lngLat.lat];
-        if (state.picking === 'from') {
-          state.pairs.push({ from: c, to: null });
-          addMarker(c, '#f59e0b');
-          state.picking = 'to';
-          setOverlayOpacity(0);
-        } else {
-          state.pairs[state.pairs.length - 1].to = c;
-          addMarker(c, '#3b82f6');
-          state.picking = null;
-          setOverlayOpacity(Number($('opacity').value) / 100);
-        }
-        render();
+        else $('status').textContent = 'No tiled scenes in the manifest yet.';
       });
-
-      $('add').onclick = () => { state.picking = 'from'; setOverlayOpacity(Number($('opacity').value) / 100); render(); };
-      $('undo').onclick = () => {
-        const last = state.pairs[state.pairs.length - 1];
-        if (!last) return;
-        if (last.to) { last.to = null; state.picking = 'to'; }
-        else { state.pairs.pop(); state.picking = null; }
-        const m = state.markers.pop(); if (m) m.remove();
-        render();
-      };
-      $('copy').onclick = async () => {
-        await navigator.clipboard.writeText($('out').value).catch(() => $('out').select());
-        $('status').textContent = 'Copied! Paste it in the chat.';
-      };
-      $('opacity').oninput = (e) => { if (!state.picking) setOverlayOpacity(Number(e.target.value) / 100); };
-      $('scene').onchange = (e) => selectScene(e.target.value);
-
-      map.on('load', loadManifest);
     </script>
   </body>
 </html>
