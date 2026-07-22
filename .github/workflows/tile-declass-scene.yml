@@ -112,9 +112,11 @@ jobs:
           ZMAX=$(python3 -c "import math; print(min(${{ inputs.max_zoom }}, math.ceil(math.log2(156543.03 / $NATIVE))))")
           TR=$(python3 -c "print(156543.03 / 2 ** $ZMAX)")
           echo "native ground resolution: ${NATIVE} m/px -> tiling to z${ZMAX} (${TR} m/px)"
+          # DEFLATE is lossless — the JPEG intermediate used previously cost
+          # a small amount of film grain; nothing may degrade the scan.
           gdalwarp -t_srs EPSG:3857 -r bilinear -order 1 -dstalpha -tr "$TR" "$TR" \
-            -co COMPRESS=JPEG -co TILED=YES -co BIGTIFF=YES --config GDAL_CACHEMAX 2048 \
-            /tmp/gcp.vrt /tmp/warped.tif
+            -co COMPRESS=DEFLATE -co PREDICTOR=2 -co TILED=YES -co BIGTIFF=YES \
+            --config GDAL_CACHEMAX 2048 /tmp/gcp.vrt /tmp/warped.tif
           gdal2tiles.py --xyz -z "8-${ZMAX}" -w none --processes=4 /tmp/warped.tif /tmp/tiles
           BOUNDS=$(python3 -c "import json,subprocess;d=json.loads(subprocess.run(['gdalinfo','-json','/tmp/warped.tif'],capture_output=True,text=True).stdout);c=d['wgs84Extent']['coordinates'][0];xs=[p[0] for p in c];ys=[p[1] for p in c];print(min(xs),min(ys),max(xs),max(ys))")
           echo "warped bounds: $BOUNDS"
