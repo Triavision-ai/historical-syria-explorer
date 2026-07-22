@@ -1,0 +1,12 @@
+{
+  "DZB00402700090H020001": {
+    "note": "Hama 1966 KH-7 — landmark-calibrated (citadel + airbase), ~40 m residual",
+    "order": ["se", "ne", "nw", "sw"],
+    "corners": {
+      "nw": [36.953, 35.23476],
+      "ne": [36.98349, 35.06467],
+      "se": [36.43069, 35.01413],
+      "sw": [36.41404, 35.17527]
+    }
+  }
+}
