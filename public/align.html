@@ -44,6 +44,7 @@
       <div class="row">
         <button id="move" class="secondary">✋ Move</button>
         <button id="sharpen" class="secondary">🔍 Sharpen here</button>
+        <button id="mirror" class="secondary">⇋ Mirror</button>
         <button id="reset" class="secondary">Reset</button>
         <button id="copy">Copy alignment code</button>
       </div>
@@ -142,16 +143,21 @@
         return [cx + xr / kLon, cy + yr / kLat];
       }
 
+      /** Horizontal flip: swap the left/right corners of a display quad. */
+      const maybeMirror = (q) => (state.mirror ? [q[1], q[0], q[3], q[2]] : q);
+
       function refresh() {
         if (!state.baseQuad) return;
-        map.getSource('old')?.setCoordinates(transformed(state.baseQuad));
-        if (state.patchQuad) map.getSource('patch')?.setCoordinates(transformed(state.patchQuad));
+        map.getSource('old')?.setCoordinates(maybeMirror(transformed(state.baseQuad)));
+        if (state.patchQuad)
+          map.getSource('patch')?.setCoordinates(maybeMirror(transformed(state.patchQuad)));
         const q = transformed(state.boundsQuad).map((c) => c.map((v) => Number(v.toFixed(6))));
         $('out').value = JSON.stringify({
           scene: state.sceneId,
           move: { dLon: +state.dx.toFixed(6), dLat: +state.dy.toFixed(6) },
           rotateDeg: +((state.theta * 180) / Math.PI).toFixed(3),
           scale: +state.scale.toFixed(4),
+          mirrored: !!state.mirror,
           center: state.center.map((v) => +v.toFixed(6)),
           boundsQuad: { nw: q[0], ne: q[1], se: q[2], sw: q[3] },
         });
@@ -160,6 +166,7 @@
       async function selectScene(id) {
         state.sceneId = id; state.entry = state.manifest[id];
         state.dx = state.dy = state.theta = 0; state.scale = 1; state.patchQuad = null;
+        state.mirror = false; $('mirror').classList.remove('active');
         $('rot').value = 0; $('scl').value = 1000; $('rotv').value = '0.0'; $('sclv').value = '100.0';
         $('status').textContent = 'Building scene snapshot…';
         const [w, s, e, n] = state.entry.bounds;
@@ -256,6 +263,11 @@
       $('opacity').oninput = (e) => setOpacity(Number(e.target.value));
       $('opv').onchange = (e) => setOpacity(Number(e.target.value));
       $('sharpen').onclick = sharpenHere;
+      $('mirror').onclick = () => {
+        state.mirror = !state.mirror;
+        $('mirror').classList.toggle('active', state.mirror);
+        refresh();
+      };
       $('reset').onclick = () => selectScene(state.sceneId);
       $('copy').onclick = async () => {
         await navigator.clipboard.writeText($('out').value).catch(() => $('out').select());
