@@ -98,6 +98,8 @@ jobs:
           echo "$PREP"
           VRT=$(echo "$PREP" | grep '^VRT:' | cut -d: -f2-)
           GCPS=$(echo "$PREP" | grep '^GCPS:' | cut -d: -f2-)
+          ORDER=$(echo "$PREP" | grep '^ORDER:' | cut -d: -f2-)
+          CORNERS=$(echo "$PREP" | grep '^CORNERS:' | cut -d: -f2-)
           gdal_translate -of VRT -a_srs EPSG:4326 $GCPS "$VRT" /tmp/gcp.vrt
           # Never sample beyond the film's native ground resolution: cap the
           # requested zoom at the scan's real detail (no upsampling, no loss).
@@ -125,6 +127,7 @@ jobs:
           BOUNDS=$(python3 -c "import json,subprocess;d=json.loads(subprocess.run(['gdalinfo','-json','/tmp/warped.tif'],capture_output=True,text=True).stdout);c=d['wgs84Extent']['coordinates'][0];xs=[p[0] for p in c];ys=[p[1] for p in c];print(min(xs),min(ys),max(xs),max(ys))")
           echo "warped bounds: $BOUNDS"
           node scripts/update-tiles-manifest.mjs "${{ steps.download.outputs.entity }}" 8 "$ZMAX" r2 $BOUNDS
+          node scripts/update-corners-registry.mjs "${{ steps.download.outputs.entity }}" "$CORNERS" "$ORDER"
           du -sh /tmp/tiles
 
       - name: Upload tiles to R2
@@ -159,7 +162,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # Old in-repo pyramid for this scene is superseded by R2.
           git rm -r -q --ignore-unmatch "public/tiles/${{ steps.download.outputs.entity }}"
-          git add public/tiles/index.json
+          git add public/tiles/index.json public/tiles/corners.json
           git commit -m "data: R2 full-resolution tiles for ${{ steps.download.outputs.entity }}"
           for attempt in 1 2 3 4; do
             if git push; then break; fi

@@ -2,12 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
     <title>Scene Alignment Tool — Historical Syria Explorer</title>
     <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
     <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
     <style>
-      html, body { margin: 0; height: 100%; background: #0b0f14; color: #e5e7eb; font-family: system-ui, sans-serif; }
+      html, body { margin: 0; height: 100%; background: #0b0f14; color: #e5e7eb; font-family: system-ui, sans-serif; touch-action: manipulation; }
+      button, select, input { touch-action: manipulation; }
+      #panel.collapsed > *:not(.paneltop) { display: none; }
       #map { position: absolute; inset: 0; }
       #panel {
         position: absolute; top: 8px; left: 8px; right: 8px; z-index: 10;
@@ -44,7 +46,10 @@
       <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:#0b0f14; border:1px solid #38bdf8; color:#38bdf8; border-radius:9999px; padding:4px 6px; font-size:12px;">⇔</div>
     </div>
     <div id="panel">
-      <b>Scene alignment — move / rotate / scale by eye</b>
+      <div class="paneltop" style="display:flex; justify-content:space-between; align-items:center;">
+        <b>Scene alignment — move / rotate / scale by eye</b>
+        <button id="fold" class="secondary" style="padding:2px 10px; margin:0;">▾</button>
+      </div>
       <div class="hint">
         Pick a scene, press <b>Move</b> and drag the old image until landmarks match today's
         imagery. Fine-tune with the rotate and scale sliders. Then copy the code and send it in the chat.
@@ -61,6 +66,7 @@
       <div class="row"><label>Opacity</label><input id="opacity" type="range" min="0" max="100" value="65" /><input id="opv" type="number" min="0" max="100" step="1" value="65" /></div>
       <div class="row"><label>Rotate °</label><input id="rot" type="range" min="-1800" max="1800" value="0" /><input id="rotv" type="number" min="-180" max="180" step="0.1" value="0" /></div>
       <div class="row"><label>Scale %</label><input id="scl" type="range" min="500" max="1500" value="1000" /><input id="sclv" type="number" min="50" max="150" step="0.1" value="100" /></div>
+      <div class="row"><button id="apply">⚙ Apply permanently (admin)</button></div>
       <div id="status">Loading scenes…</div>
       <textarea id="out" readonly></textarea>
     </div>
@@ -89,6 +95,17 @@
         },
         center: [36.7578, 35.1318], zoom: 12,
       });
+      // Phones: accidental two-finger rotation/pitch makes alignment feel
+      // random — lock the map north-up so pinch only zooms.
+      map.dragRotate.disable();
+      map.touchZoomRotate.disableRotation();
+      if (map.touchPitch) map.touchPitch.disable();
+
+      $('fold').onclick = () => {
+        const panel = $('panel');
+        panel.classList.toggle('collapsed');
+        $('fold').textContent = panel.classList.contains('collapsed') ? '▸' : '▾';
+      };
 
       // ---- tile math ----
       const lon2x = (lon, z) => ((lon + 180) / 360) * 2 ** z;
@@ -338,6 +355,72 @@
       $('copy').onclick = async () => {
         await navigator.clipboard.writeText($('out').value).catch(() => $('out').select());
         $('status').textContent = 'Copied! Paste the code in the chat.';
+      };
+
+      // ---- admin: apply the current adjustment via the processing pipeline ----
+      const REPO = 'Triavision-ai/historical-syria-explorer';
+      $('apply').onclick = async () => {
+        if (!state.sceneId) return;
+        if (!confirm('Re-cut this scene with the current adjustment?\nProcessing takes 1–2 hours; the site updates automatically when done.')) return;
+        let token = localStorage.getItem('ghToken') || '';
+        if (!token) {
+          token = (prompt('GitHub access token with Actions write permission on the repository (asked once; stays in this browser only):') || '').trim();
+          if (!token) return;
+          localStorage.setItem('ghToken', token);
+        }
+        $('status').textContent = 'Submitting to the pipeline…';
+        try {
+          const registry = await fetch('tiles/corners.json?t=' + new Date().getTime())
+            .then((r) => (r.ok ? r.json() : {}));
+          const entry = registry[state.sceneId];
+          if (!entry?.corners) {
+            $('status').textContent = 'No calibration record for this scene yet — send the code in the chat instead.';
+            return;
+          }
+          // The registry maps mosaic pixel corners → geography; apply the
+          // same on-screen adjustment (mirror in frame space, then the
+          // similarity transform) to those anchor points.
+          const newCorners = {};
+          for (const [key, lonLat] of Object.entries(entry.corners)) {
+            const base = state.mirror ? mirrorBase(lonLat) : lonLat;
+            newCorners[key] = transformed([base])[0].map((v) => Number(v.toFixed(6)));
+          }
+          let dataset = 'declassii';
+          try {
+            const catalog = await fetch('catalog/declass-syria.json').then((r) => r.json());
+            dataset = catalog.scenes.find((s) => s.entityId === state.sceneId)?.dataset ?? dataset;
+          } catch { /* seed default */ }
+          const res = await fetch(
+            `https://api.github.com/repos/${REPO}/actions/workflows/tile-declass-scene.yml/dispatches`,
+            {
+              method: 'POST',
+              headers: {
+                Authorization: 'Bearer ' + localStorage.getItem('ghToken'),
+                Accept: 'application/vnd.github+json',
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                ref: 'main',
+                inputs: {
+                  entity_id: state.sceneId,
+                  dataset,
+                  max_zoom: '18',
+                  corner_order: (entry.order ?? []).join(','),
+                  corners_json: JSON.stringify(newCorners),
+                  clean_r2: 'true',
+                },
+              }),
+            },
+          );
+          if (res.status === 204) {
+            $('status').textContent = '✓ Accepted — re-cutting now. The site updates itself in 1–2 hours.';
+          } else {
+            if (res.status === 401 || res.status === 403) localStorage.removeItem('ghToken');
+            $('status').textContent = `Pipeline rejected the request (${res.status}) — check the token and try again.`;
+          }
+        } catch (error) {
+          $('status').textContent = 'Could not reach the pipeline: ' + error.message;
+        }
       };
       $('scene').onchange = (e) => selectScene(e.target.value);
 

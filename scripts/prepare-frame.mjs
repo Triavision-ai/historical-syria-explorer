@@ -237,3 +237,9 @@ const gcps = [
 ];
 console.log(`VRT:${vrtPath}`);
 console.log(`GCPS:${gcps.join(' ')}`);
+// Machine-readable record of the mapping used — the workflow persists this
+// to the calibration registry so tools (and re-runs) can build on it.
+console.log(`ORDER:${best.order.join(',')}`);
+console.log(
+  `CORNERS:${JSON.stringify(Object.fromEntries(Object.entries(corners).map(([k, v]) => [k, [v.lon, v.lat]])))}`,
+);
