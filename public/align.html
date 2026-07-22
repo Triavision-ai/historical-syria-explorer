@@ -143,14 +143,19 @@
         return [cx + xr / kLon, cy + yr / kLat];
       }
 
-      /** Horizontal flip: swap the left/right corners of a display quad. */
-      const maybeMirror = (q) => (state.mirror ? [q[1], q[0], q[3], q[2]] : q);
+      /** Reflect a base-frame point across the frame's vertical centerline. */
+      function mirrorBase([lon, lat]) {
+        const west = state.baseQuad[0][0], east = state.baseQuad[1][0];
+        return [west + east - lon, lat];
+      }
+      /** Frame-space mirror (before the similarity transform) when enabled. */
+      const inFrame = (quad) => (state.mirror ? quad.map(mirrorBase) : quad);
 
       function refresh() {
         if (!state.baseQuad) return;
-        map.getSource('old')?.setCoordinates(maybeMirror(transformed(state.baseQuad)));
+        map.getSource('old')?.setCoordinates(transformed(inFrame(state.baseQuad)));
         if (state.patchQuad)
-          map.getSource('patch')?.setCoordinates(maybeMirror(transformed(state.patchQuad)));
+          map.getSource('patch')?.setCoordinates(transformed(inFrame(state.patchQuad)));
         const q = transformed(state.boundsQuad).map((c) => c.map((v) => Number(v.toFixed(6))));
         $('out').value = JSON.stringify({
           scene: state.sceneId,
@@ -191,10 +196,13 @@
         if (!state.entry) return;
         $('status').textContent = 'Fetching full-detail tiles for this view…';
         const view = map.getBounds();
-        // Map the viewport back into the untransformed frame and clamp to it.
+        // Map the viewport back into the untransformed frame (undoing the
+        // mirror too — mirrored content comes from the opposite frame side)
+        // and clamp to it.
+        const back = (p) => (state.mirror ? mirrorBase(inverse(p)) : inverse(p));
         const pts = [
-          inverse([view.getWest(), view.getNorth()]), inverse([view.getEast(), view.getNorth()]),
-          inverse([view.getEast(), view.getSouth()]), inverse([view.getWest(), view.getSouth()]),
+          back([view.getWest(), view.getNorth()]), back([view.getEast(), view.getNorth()]),
+          back([view.getEast(), view.getSouth()]), back([view.getWest(), view.getSouth()]),
         ];
         const [bw, bs, be, bn] = state.entry.bounds;
         const w = Math.max(bw, Math.min(...pts.map((p) => p[0])));
@@ -206,7 +214,7 @@
         state.patchQuad = snap.quad;
         if (map.getLayer('patch')) map.removeLayer('patch');
         if (map.getSource('patch')) map.removeSource('patch');
-        map.addSource('patch', { type: 'image', url: snap.url, coordinates: transformed(snap.quad) });
+        map.addSource('patch', { type: 'image', url: snap.url, coordinates: transformed(inFrame(snap.quad)) });
         map.addLayer({ id: 'patch', type: 'raster', source: 'patch',
           paint: { 'raster-opacity': Number($('opacity').value) / 100, 'raster-fade-duration': 0 } });
         $('status').textContent = 'Sharp view loaded — align, then 🔍 again after big moves.';
