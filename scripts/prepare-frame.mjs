@@ -90,14 +90,29 @@ try {
 } catch (error) {
   console.error(`scene-metadata unavailable (${error.message}); using catalog bounds`);
 }
-if (process.env.CORNERS_JSON) {
-  const raw = JSON.parse(process.env.CORNERS_JSON);
-  corners = Object.fromEntries(
+const normalizeCorners = (raw) =>
+  Object.fromEntries(
     Object.entries(raw).map(([key, value]) => [
       key,
       Array.isArray(value) ? { lon: value[0], lat: value[1] } : value,
     ]),
   );
+
+// Permanent per-scene corrections (hand-aligned once, saved forever).
+let registryOrder = null;
+try {
+  const registry = JSON.parse(await readFile('public/tiles/corners.json', 'utf8'));
+  const entry = registry[entityId];
+  if (entry?.corners) {
+    corners = normalizeCorners(entry.corners);
+    registryOrder = entry.order ?? null;
+    console.error('using calibrated corners from public/tiles/corners.json');
+  }
+} catch {
+  // No registry yet.
+}
+if (process.env.CORNERS_JSON) {
+  corners = normalizeCorners(JSON.parse(process.env.CORNERS_JSON));
   console.error('using CORNERS_JSON override');
 }
 if (!corners) {
@@ -149,6 +164,7 @@ for (const axis of segments.length > 1 ? ['x', 'y'] : ['y']) {
     if (!best || score < best.score) best = { axis, order, score, width, height };
   }
 }
+if (registryOrder) best.order = registryOrder;
 if (process.env.CORNER_ORDER) {
   best.order = process.env.CORNER_ORDER.split(',').map((c) => c.trim().toLowerCase());
 }
