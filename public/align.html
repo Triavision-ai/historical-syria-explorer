@@ -34,6 +34,15 @@
   </head>
   <body>
     <div id="map"></div>
+    <!-- Compare mode: a clean current-day map clipped to the right of the
+         divider; pointer-events pass through to the main map beneath. -->
+    <div id="cmpwrap" style="position:absolute; top:0; bottom:0; right:0; left:50%; overflow:hidden; pointer-events:none; display:none; z-index:5;">
+      <div id="cmpmap" style="position:absolute; top:0; bottom:0; right:0; width:100vw;"></div>
+    </div>
+    <div id="cmphandle" style="position:absolute; top:0; bottom:0; left:50%; width:26px; margin-left:-13px; display:none; z-index:6; cursor:ew-resize; touch-action:none;">
+      <div style="position:absolute; top:0; bottom:0; left:12px; width:2px; background:#38bdf8;"></div>
+      <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:#0b0f14; border:1px solid #38bdf8; color:#38bdf8; border-radius:9999px; padding:4px 6px; font-size:12px;">⇔</div>
+    </div>
     <div id="panel">
       <b>Scene alignment — move / rotate / scale by eye</b>
       <div class="hint">
@@ -45,6 +54,7 @@
         <button id="move" class="secondary">✋ Move</button>
         <button id="sharpen" class="secondary">🔍 Sharpen here</button>
         <button id="mirror" class="secondary">⇋ Mirror</button>
+        <button id="compare" class="secondary">◧ Compare</button>
         <button id="reset" class="secondary">Reset</button>
         <button id="copy">Copy alignment code</button>
       </div>
@@ -270,6 +280,54 @@
       $('sclv').onchange = (e) => setScale(Number(e.target.value));
       $('opacity').oninput = (e) => setOpacity(Number(e.target.value));
       $('opv').onchange = (e) => setOpacity(Number(e.target.value));
+      // ---- compare divider: right of the line shows today's imagery only ----
+      let cmpMap = null;
+      let cmpOn = false;
+      function syncCmp() {
+        if (!cmpMap) return;
+        cmpMap.jumpTo({
+          center: map.getCenter(), zoom: map.getZoom(),
+          bearing: map.getBearing(), pitch: map.getPitch(),
+        });
+      }
+      function setDivider(fraction) {
+        fraction = Math.max(0.08, Math.min(0.92, fraction));
+        $('cmpwrap').style.left = fraction * 100 + '%';
+        $('cmphandle').style.left = fraction * 100 + '%';
+      }
+      $('compare').onclick = () => {
+        cmpOn = !cmpOn;
+        $('compare').classList.toggle('active', cmpOn);
+        $('cmpwrap').style.display = cmpOn ? 'block' : 'none';
+        $('cmphandle').style.display = cmpOn ? 'block' : 'none';
+        if (cmpOn && !cmpMap) {
+          cmpMap = new maplibregl.Map({
+            container: 'cmpmap', interactive: false, attributionControl: false,
+            style: {
+              version: 8,
+              sources: { esri2: { type: 'raster', tileSize: 256,
+                tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'] } },
+              layers: [{ id: 'esri2', type: 'raster', source: 'esri2' }],
+            },
+            center: map.getCenter(), zoom: map.getZoom(),
+          });
+          map.on('move', syncCmp);
+        }
+        if (cmpOn) { setDivider(0.5); cmpMap.resize(); syncCmp(); }
+      };
+      $('cmphandle').addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        $('cmphandle').setPointerCapture(e.pointerId);
+        const onMove = (ev) => setDivider(ev.clientX / window.innerWidth);
+        const onUp = () => {
+          window.removeEventListener('pointermove', onMove);
+          window.removeEventListener('pointerup', onUp);
+          if (cmpMap) cmpMap.resize();
+        };
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
+      });
+
       $('sharpen').onclick = sharpenHere;
       $('mirror').onclick = () => {
         state.mirror = !state.mirror;
