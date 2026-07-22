@@ -22,7 +22,11 @@
       .row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
       .row label { width: 62px; color: #9ca3af; }
       .row input[type=range] { flex: 1; }
-      .row output { width: 64px; text-align: right; font-variant-numeric: tabular-nums; }
+      .row input[type=number] {
+        width: 76px; text-align: right; font-variant-numeric: tabular-nums;
+        background: #111827; color: #e5e7eb; border: 1px solid #374151;
+        border-radius: 6px; padding: 4px 6px; font-size: 13px;
+      }
       #status { margin-top: 6px; color: #fbbf24; min-height: 16px; font-size: 12px; }
       textarea { width: 100%; height: 64px; background: #111827; color: #a7f3d0; border: 1px solid #374151; border-radius: 6px; font-family: monospace; font-size: 11px; margin-top: 6px; }
       .hint { color: #9ca3af; font-size: 12px; }
@@ -43,9 +47,9 @@
         <button id="reset" class="secondary">Reset</button>
         <button id="copy">Copy alignment code</button>
       </div>
-      <div class="row"><label>Opacity</label><input id="opacity" type="range" min="0" max="100" value="65" /><output id="opv">65%</output></div>
-      <div class="row"><label>Rotate</label><input id="rot" type="range" min="-1800" max="1800" value="0" /><output id="rotv">0.0°</output></div>
-      <div class="row"><label>Scale</label><input id="scl" type="range" min="500" max="1500" value="1000" /><output id="sclv">100.0%</output></div>
+      <div class="row"><label>Opacity</label><input id="opacity" type="range" min="0" max="100" value="65" /><input id="opv" type="number" min="0" max="100" step="1" value="65" /></div>
+      <div class="row"><label>Rotate °</label><input id="rot" type="range" min="-1800" max="1800" value="0" /><input id="rotv" type="number" min="-180" max="180" step="0.1" value="0" /></div>
+      <div class="row"><label>Scale %</label><input id="scl" type="range" min="500" max="1500" value="1000" /><input id="sclv" type="number" min="50" max="150" step="0.1" value="100" /></div>
       <div id="status">Loading scenes…</div>
       <textarea id="out" readonly></textarea>
     </div>
@@ -156,7 +160,7 @@
       async function selectScene(id) {
         state.sceneId = id; state.entry = state.manifest[id];
         state.dx = state.dy = state.theta = 0; state.scale = 1; state.patchQuad = null;
-        $('rot').value = 0; $('scl').value = 1000; $('rotv').textContent = '0.0°'; $('sclv').textContent = '100.0%';
+        $('rot').value = 0; $('scl').value = 1000; $('rotv').value = '0.0'; $('sclv').value = '100.0';
         $('status').textContent = 'Building scene snapshot…';
         const [w, s, e, n] = state.entry.bounds;
         state.center = [(w + e) / 2, (s + n) / 2];
@@ -223,13 +227,34 @@
       const dragEnd = () => { state.dragging = false; };
       map.on('mouseup', dragEnd); map.on('touchend', dragEnd);
 
-      $('rot').oninput = (e) => { state.theta = (Number(e.target.value) / 10) * (Math.PI / 180); $('rotv').textContent = (Number(e.target.value) / 10).toFixed(1) + '°'; refresh(); };
-      $('scl').oninput = (e) => { state.scale = Number(e.target.value) / 1000; $('sclv').textContent = (state.scale * 100).toFixed(1) + '%'; refresh(); };
-      $('opacity').oninput = (e) => {
-        $('opv').textContent = e.target.value + '%';
-        for (const layer of ['old', 'patch'])
-          if (map.getLayer(layer)) map.setPaintProperty(layer, 'raster-opacity', Number(e.target.value) / 100);
+      // Rotate / scale / opacity: slider and number box drive the same value.
+      const setRotate = (deg) => {
+        deg = Math.max(-180, Math.min(180, deg || 0));
+        state.theta = deg * (Math.PI / 180);
+        $('rot').value = Math.round(deg * 10);
+        $('rotv').value = deg.toFixed(1);
+        refresh();
       };
+      const setScale = (pct) => {
+        pct = Math.max(50, Math.min(150, pct || 100));
+        state.scale = pct / 100;
+        $('scl').value = Math.round(pct * 10);
+        $('sclv').value = pct.toFixed(1);
+        refresh();
+      };
+      const setOpacity = (pct) => {
+        pct = Math.max(0, Math.min(100, pct || 0));
+        $('opacity').value = pct;
+        $('opv').value = pct;
+        for (const layer of ['old', 'patch'])
+          if (map.getLayer(layer)) map.setPaintProperty(layer, 'raster-opacity', pct / 100);
+      };
+      $('rot').oninput = (e) => setRotate(Number(e.target.value) / 10);
+      $('rotv').onchange = (e) => setRotate(Number(e.target.value));
+      $('scl').oninput = (e) => setScale(Number(e.target.value) / 10);
+      $('sclv').onchange = (e) => setScale(Number(e.target.value));
+      $('opacity').oninput = (e) => setOpacity(Number(e.target.value));
+      $('opv').onchange = (e) => setOpacity(Number(e.target.value));
       $('sharpen').onclick = sharpenHere;
       $('reset').onclick = () => selectScene(state.sceneId);
       $('copy').onclick = async () => {
