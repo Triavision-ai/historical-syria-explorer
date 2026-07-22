@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Scene Alignment Tool — Historical Syria Explorer</title>
+    <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+    <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+    <style>
+      html, body { margin: 0; height: 100%; background: #0b0f14; color: #e5e7eb; font-family: system-ui, sans-serif; }
+      #map { position: absolute; inset: 0; }
+      #panel {
+        position: absolute; top: 8px; left: 8px; right: 8px; z-index: 10;
+        background: rgba(11, 15, 20, 0.92); border: 1px solid #1f2937; border-radius: 10px;
+        padding: 10px 12px; max-width: 430px; font-size: 13px; line-height: 1.45;
+      }
+      select, button, input[type=range] { font-size: 13px; }
+      select { width: 100%; background: #111827; color: #e5e7eb; border: 1px solid #374151; border-radius: 6px; padding: 6px; margin: 6px 0; }
+      button { background: #2563eb; color: white; border: 0; border-radius: 6px; padding: 7px 10px; margin: 4px 4px 0 0; cursor: pointer; }
+      button.secondary { background: #374151; }
+      button:disabled { opacity: 0.4; cursor: default; }
+      #status { margin-top: 6px; color: #fbbf24; min-height: 18px; }
+      #pairs { margin: 6px 0 0; padding-left: 18px; color: #9ca3af; }
+      textarea { width: 100%; height: 74px; background: #111827; color: #a7f3d0; border: 1px solid #374151; border-radius: 6px; font-family: monospace; font-size: 11px; margin-top: 6px; }
+      .row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+      .hint { color: #9ca3af; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <div id="panel">
+      <b>Scene alignment — by eye</b>
+      <div class="hint">
+        1) Pick a scene. 2) Press <b>Add pair</b>, click a landmark <i>on the old image</i>,
+        then click the <i>same place on today's imagery</i> (overlay hides automatically).
+        3) Repeat for 2–3 landmarks spread apart. 4) Copy the code and send it in the chat.
+      </div>
+      <select id="scene"></select>
+      <div class="row">
+        <span>Old image opacity</span>
+        <input id="opacity" type="range" min="0" max="100" value="70" style="flex:1" />
+      </div>
+      <button id="add">Add pair</button>
+      <button id="undo" class="secondary">Undo</button>
+      <button id="copy" class="secondary" disabled>Copy alignment code</button>
+      <div id="status"></div>
+      <ol id="pairs"></ol>
+      <textarea id="out" readonly placeholder="Alignment code appears here after 2 pairs"></textarea>
+    </div>
+    <script>
+      const TILES_BASE = 'https://pub-f8ac6c500eea43b28591b7b636fc9e3d.r2.dev';
+      const state = { manifest: {}, sceneId: null, pairs: [], picking: null, markers: [] };
+
+      const map = new maplibregl.Map({
+        container: 'map',
+        style: {
+          version: 8,
+          sources: {
+            esri: {
+              type: 'raster', tileSize: 256,
+              tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+              attribution: 'Esri, Maxar, Earthstar Geographics',
+            },
+          },
+          layers: [{ id: 'esri', type: 'raster', source: 'esri' }],
+        },
+        center: [36.7578, 35.1318], zoom: 12,
+      });
+
+      const $ = (id) => document.getElementById(id);
+
+      async function loadManifest() {
+        const res = await fetch('tiles/index.json');
+        state.manifest = res.ok ? await res.json() : {};
+        const sel = $('scene');
+        sel.innerHTML = '';
+        for (const id of Object.keys(state.manifest)) {
+          const opt = document.createElement('option');
+          opt.value = id; opt.textContent = id;
+          sel.appendChild(opt);
+        }
+        if (sel.options.length) selectScene(sel.value);
+      }
+
+      function tileUrl(id, entry) {
+        return entry.storage === 'r2'
+          ? TILES_BASE + '/tiles/' + id + '/{z}/{x}/{y}.png'
+          : location.origin + location.pathname.replace(/align\.html$/, '') + 'tiles/' + id + '/{z}/{x}/{y}.png';
+      }
+
+      function selectScene(id) {
+        state.sceneId = id; resetPairs();
+        const entry = state.manifest[id];
+        if (map.getLayer('old')) map.removeLayer('old');
+        if (map.getSource('old')) map.removeSource('old');
+        map.addSource('old', {
+          type: 'raster', tileSize: 256, tiles: [tileUrl(id, entry)],
+          bounds: entry.bounds, minzoom: Math.max(0, entry.minZoom - 1), maxzoom: entry.maxZoom,
+        });
+        map.addLayer({ id: 'old', type: 'raster', source: 'old',
+          paint: { 'raster-opacity': Number($('opacity').value) / 100 } });
+        const [w, s, e, n] = entry.bounds;
+        map.fitBounds([[w, s], [e, n]], { padding: 40, duration: 0 });
+      }
+
+      function setOverlayOpacity(v) {
+        if (map.getLayer('old')) map.setPaintProperty('old', 'raster-opacity', v);
+      }
+
+      function resetPairs() {
+        state.pairs = []; state.picking = null;
+        state.markers.forEach((m) => m.remove()); state.markers = [];
+        render();
+      }
+
+      function render() {
+        const list = $('pairs'); list.innerHTML = '';
+        state.pairs.forEach((p, i) => {
+          const li = document.createElement('li');
+          li.textContent = 'old(' + p.from.map((x) => x.toFixed(5)) + ') → true(' +
+            (p.to ? p.to.map((x) => x.toFixed(5)) : '…click today’s imagery') + ')';
+          list.appendChild(li);
+        });
+        const complete = state.pairs.filter((p) => p.to);
+        const ready = complete.length >= 2;
+        $('copy').disabled = !ready;
+        $('out').value = ready
+          ? JSON.stringify({ scene: state.sceneId, pairs: complete })
+          : '';
+        $('status').textContent =
+          state.picking === 'from' ? 'Click the landmark ON THE OLD IMAGE' :
+          state.picking === 'to' ? 'Now click the SAME place on today’s imagery' :
+          complete.length >= 2 ? 'Ready — copy the code below and send it in the chat.' :
+          'Add at least 2 pairs (3 is better), far apart from each other.';
+      }
+
+      function addMarker(lngLat, color) {
+        const m = new maplibregl.Marker({ color }).setLngLat(lngLat).addTo(map);
+        state.markers.push(m);
+      }
+
+      map.on('click', (e) => {
+        if (!state.picking) return;
+        const c = [e.lngLat.lng, e.lngLat.lat];
+        if (state.picking === 'from') {
+          state.pairs.push({ from: c, to: null });
+          addMarker(c, '#f59e0b');
+          state.picking = 'to';
+          setOverlayOpacity(0);
+        } else {
+          state.pairs[state.pairs.length - 1].to = c;
+          addMarker(c, '#3b82f6');
+          state.picking = null;
+          setOverlayOpacity(Number($('opacity').value) / 100);
+        }
+        render();
+      });
+
+      $('add').onclick = () => { state.picking = 'from'; setOverlayOpacity(Number($('opacity').value) / 100); render(); };
+      $('undo').onclick = () => {
+        const last = state.pairs[state.pairs.length - 1];
+        if (!last) return;
+        if (last.to) { last.to = null; state.picking = 'to'; }
+        else { state.pairs.pop(); state.picking = null; }
+        const m = state.markers.pop(); if (m) m.remove();
+        render();
+      };
+      $('copy').onclick = async () => {
+        await navigator.clipboard.writeText($('out').value).catch(() => $('out').select());
+        $('status').textContent = 'Copied! Paste it in the chat.';
+      };
+      $('opacity').oninput = (e) => { if (!state.picking) setOverlayOpacity(Number(e.target.value) / 100); };
+      $('scene').onchange = (e) => selectScene(e.target.value);
+
+      map.on('load', loadManifest);
+    </script>
+  </body>
+</html>

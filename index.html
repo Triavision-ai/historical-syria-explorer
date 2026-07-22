@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5"
+    />
+    <meta name="theme-color" content="#0a0e14" />
+    <meta
+      name="description"
+      content="Historical Syria Explorer — browse historical satellite imagery of Syria from the 1960s until today."
+    />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Historical Syria Explorer</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      // After a deploy, a cached index.html can reference purged hashed
+      // assets, leaving a blank page. Reload once with a fresh fetch.
+      window.addEventListener(
+        'error',
+        (event) => {
+          const tag = event.target && event.target.tagName;
+          if ((tag === 'SCRIPT' || tag === 'LINK') && !sessionStorage.getItem('hse-reloaded')) {
+            sessionStorage.setItem('hse-reloaded', '1');
+            location.reload();
+          }
+        },
+        true,
+      );
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,43 @@
+name: Harvest USGS declassified catalog (Syria)
+
+# Manual, one-time (or occasional re-run) harvest of the closed declassified
+# archive over Syria. Requires two repository secrets:
+#   USGS_M2M_USERNAME — USGS ERS account username
+#   USGS_M2M_TOKEN    — application token from https://ers.cr.usgs.gov/password/appgenerate
+# The result is committed to main, which triggers the Pages deployment.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  harvest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Harvest catalog from USGS M2M
+        env:
+          USGS_M2M_USERNAME: ${{ secrets.USGS_M2M_USERNAME }}
+          USGS_M2M_TOKEN: ${{ secrets.USGS_M2M_TOKEN }}
+        run: node scripts/harvest-declass.mjs
+
+      - name: Commit catalog
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/catalog/declass-syria.json
+          if git diff --cached --quiet; then
+            echo "Catalog unchanged — nothing to commit."
+          else
+            git commit -m "data: refresh Syria-wide declassified imagery catalog"
+            git push
+          fi

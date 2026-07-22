@@ -1,0 +1,148 @@
+name: Tile a declassified scene (full resolution)
+
+# Downloads the original USGS film scan for one declassified scene,
+# georeferences it to the scene's corner coordinates, cuts XYZ map tiles,
+# and commits them under public/tiles/<entityId>/ so the app serves sharp
+# imagery instead of the low-res browse preview.
+#
+# Requires the same USGS_M2M_USERNAME / USGS_M2M_TOKEN secrets as the
+# catalog harvest. Georeferencing uses the archive's corner coordinates,
+# so expect an offset of a few hundred meters (film is not orthorectified);
+# hand-refined control points can improve a scene later.
+
+on:
+  workflow_dispatch:
+    inputs:
+      entity_id:
+        description: 'Candidate scene entity ids, comma-separated (first digitized one wins)'
+        required: true
+        default: 'DZB00402700090H020001'
+      dataset:
+        description: 'M2M dataset (declassi | declassii | declassiii, or as harvested e.g. corona2)'
+        required: true
+        default: 'declassii'
+      max_zoom:
+        description: 'Maximum tile zoom (15 ≈ 5 m/px, 16 doubles size)'
+        required: false
+        default: '15'
+      corner_order:
+        description: 'Manual corner order override, e.g. "ne,se,sw,nw" (blank = auto)'
+        required: false
+        default: ''
+      corners_json:
+        description: 'Corner coordinate override JSON {"nw":[lon,lat],...} (blank = archive metadata)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  tile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install GDAL
+        run: sudo apt-get update -q && sudo apt-get install -y -q gdal-bin python3-gdal unzip
+
+      - name: Download product from USGS
+        id: download
+        env:
+          USGS_M2M_USERNAME: ${{ secrets.USGS_M2M_USERNAME }}
+          USGS_M2M_TOKEN: ${{ secrets.USGS_M2M_TOKEN }}
+        run: |
+          OUT=$(node scripts/download-declass.mjs "${{ inputs.entity_id }}" "${{ inputs.dataset }}" /tmp/dl)
+          echo "$OUT"
+          echo "file=$(echo "$OUT" | tail -1)" >> "$GITHUB_OUTPUT"
+          echo "entity=$(echo "$OUT" | grep '^CHOSEN:' | tail -1 | cut -d: -f2)" >> "$GITHUB_OUTPUT"
+          ls -lh /tmp/dl
+
+      - name: Extract archive if needed
+        id: extract
+        run: |
+          FILE="${{ steps.download.outputs.file }}"
+          mkdir -p /tmp/extracted
+          case "$FILE" in
+            *.zip) unzip -o "$FILE" -d /tmp/extracted ;;
+            *.tar.gz|*.tgz) tar -xzf "$FILE" -C /tmp/extracted ;;
+            *.tar) tar -xf "$FILE" -C /tmp/extracted ;;
+            *) cp "$FILE" /tmp/extracted/ ;;
+          esac
+          rm -f "$FILE"
+          COUNT=$(find /tmp/extracted -type f \( -iname '*.tif' -o -iname '*.tiff' \) | wc -l)
+          if [ "$COUNT" = "0" ]; then echo "No raster found"; find /tmp/extracted -type f | head; exit 1; fi
+          echo "Found $COUNT film segment(s)"
+
+      - name: Georeference and tile
+        env:
+          USGS_M2M_USERNAME: ${{ secrets.USGS_M2M_USERNAME }}
+          USGS_M2M_TOKEN: ${{ secrets.USGS_M2M_TOKEN }}
+          CORNER_ORDER: ${{ inputs.corner_order }}
+          CORNERS_JSON: ${{ inputs.corners_json }}
+        run: |
+          set -e
+          PREP=$(node scripts/prepare-frame.mjs "${{ steps.download.outputs.entity }}" "${{ inputs.dataset }}" /tmp/extracted)
+          echo "$PREP"
+          VRT=$(echo "$PREP" | grep '^VRT:' | cut -d: -f2-)
+          GCPS=$(echo "$PREP" | grep '^GCPS:' | cut -d: -f2-)
+          gdal_translate -of VRT -a_srs EPSG:4326 $GCPS "$VRT" /tmp/gcp.vrt
+          TR=$(python3 -c "print(156543.03 / 2 ** ${{ inputs.max_zoom }})")
+          gdalwarp -t_srs EPSG:3857 -r bilinear -order 1 -dstalpha -tr "$TR" "$TR" \
+            -co COMPRESS=JPEG -co TILED=YES --config GDAL_CACHEMAX 2048 \
+            /tmp/gcp.vrt /tmp/warped.tif
+          gdal2tiles.py --xyz -z "8-${{ inputs.max_zoom }}" -w none --processes=4 /tmp/warped.tif /tmp/tiles
+          BOUNDS=$(python3 -c "import json,subprocess;d=json.loads(subprocess.run(['gdalinfo','-json','/tmp/warped.tif'],capture_output=True,text=True).stdout);c=d['wgs84Extent']['coordinates'][0];xs=[p[0] for p in c];ys=[p[1] for p in c];print(min(xs),min(ys),max(xs),max(ys))")
+          echo "warped bounds: $BOUNDS"
+          node scripts/update-tiles-manifest.mjs "${{ steps.download.outputs.entity }}" 8 "${{ inputs.max_zoom }}" r2 $BOUNDS
+          du -sh /tmp/tiles
+
+      - name: Upload tiles to R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+        run: |
+          ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          # Browsers need CORS to use tiles as WebGL textures; idempotent.
+          aws s3api put-bucket-cors --bucket syria-tiles --endpoint-url "$ENDPOINT" \
+            --cors-configuration '{"CORSRules":[{"AllowedOrigins":["*"],"AllowedMethods":["GET","HEAD"],"AllowedHeaders":["*"],"MaxAgeSeconds":86400}]}' || true
+          aws s3 sync /tmp/tiles "s3://syria-tiles/tiles/${{ steps.download.outputs.entity }}" \
+            --endpoint-url "$ENDPOINT" --no-progress --only-show-errors \
+            --cache-control "public, max-age=31536000, immutable"
+          echo "Uploaded $(find /tmp/tiles -name '*.png' | wc -l) tiles"
+
+      - name: Commit manifest
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Old in-repo pyramid for this scene is superseded by R2.
+          git rm -r -q --ignore-unmatch "public/tiles/${{ steps.download.outputs.entity }}"
+          git add public/tiles/index.json
+          git commit -m "data: R2 full-resolution tiles for ${{ steps.download.outputs.entity }}"
+          for attempt in 1 2 3 4; do
+            if git push; then break; fi
+            echo "push rejected, rebasing (attempt $attempt)"
+            git pull --rebase origin main
+            sleep 5
+          done
+
+      - name: Trigger Pages deploy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sleep 15  # let the pushed commit become the branch tip before dispatching
+          curl -sS -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/deploy.yml/dispatches" \
+            -d '{"ref":"main"}'

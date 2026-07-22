@@ -1,0 +1,46 @@
+@import 'tailwindcss';
+@import 'maplibre-gl/dist/maplibre-gl.css';
+
+@theme {
+  --color-surface-950: #0a0e14;
+  --color-surface-900: #0f141c;
+  --color-surface-800: #161d28;
+  --color-surface-700: #1f2937;
+  --color-surface-600: #2b3648;
+  --color-accent-400: #38bdf8;
+  --color-accent-500: #0ea5e9;
+  --color-amber-hl: #f59e0b;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: var(--color-surface-950);
+  color: #e5e7eb;
+  font-family:
+    'Inter',
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  overscroll-behavior: none;
+}
+
+/* Keep MapLibre attribution readable on the dark UI without hiding it. */
+.maplibregl-ctrl-attrib {
+  background: rgba(10, 14, 20, 0.7) !important;
+}
+.maplibregl-ctrl-attrib,
+.maplibregl-ctrl-attrib a {
+  color: #9ca3af !important;
+  font-size: 10px;
+}
+
+/* Thin dark scrollbars for panels */
+.panel-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-surface-600) transparent;
+}

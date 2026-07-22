@@ -1,0 +1,49 @@
+name: Harvest Maxar Open Data catalog (Syria)
+
+# Builds the static index of Maxar Open Data Program scenes over Syria
+# (CC BY-NC 4.0 imagery released after major disasters). Public data —
+# no credentials required. Commits the catalog to main and redeploys.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  harvest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Harvest Maxar Open Data index
+        run: node scripts/harvest-maxar.mjs
+
+      - name: Commit catalog
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/catalog/maxar-syria.json
+          if git diff --cached --quiet; then
+            echo "Catalog unchanged."
+          else
+            git commit -m "data: refresh Maxar Open Data Syria catalog"
+            git push
+          fi
+
+      - name: Trigger Pages deploy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sleep 15  # let the pushed commit become the branch tip before dispatching
+          curl -sS -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/deploy.yml/dispatches" \
+            -d '{"ref":"main"}'
