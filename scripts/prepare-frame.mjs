@@ -173,12 +173,42 @@ console.error(
 );
 
 // ---------- 4. write VRT and GCPs ----------
-let offset = 0;
-const sources = segments
-  .map((segment) => {
-    const xOff = best.axis === 'x' ? offset : 0;
-    const yOff = best.axis === 'y' ? offset : 0;
+// Adjacent scanner passes share an overlapping margin; butting them
+// edge-to-edge duplicates the seam. Measure the true offsets by content
+// (phase correlation); fall back to butt joints if measurement fails.
+let placements;
+try {
+  const out = execFileSync(
+    'python3',
+    ['scripts/segment-offsets.py', best.axis, ...segments.map((s) => s.file)],
+    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] },
+  );
+  placements = out
+    .trim()
+    .split('\n')
+    .map((line) => line.trim().split(/\s+/).map(Number));
+  if (placements.length !== segments.length || placements.some((p) => p.some(Number.isNaN)))
+    throw new Error('bad offsets output');
+  console.error(`measured segment offsets: ${placements.map((p) => p.join(',')).join(' | ')}`);
+} catch (error) {
+  console.error(`overlap measurement failed (${error.message}); using butt joints`);
+  let offset = 0;
+  placements = segments.map((segment) => {
+    const place = best.axis === 'x' ? [offset, 0] : [0, offset];
     offset += best.axis === 'x' ? segment.width : segment.height;
+    return place;
+  });
+}
+// Normalize to non-negative offsets and recompute the mosaic envelope.
+const minX = Math.min(...placements.map((p) => p[0]));
+const minY = Math.min(...placements.map((p) => p[1]));
+placements = placements.map(([x, y]) => [x - minX, y - minY]);
+best.width = Math.max(...segments.map((s, i) => placements[i][0] + s.width));
+best.height = Math.max(...segments.map((s, i) => placements[i][1] + s.height));
+
+const sources = segments
+  .map((segment, i) => {
+    const [xOff, yOff] = placements[i];
     return `    <SimpleSource>
       <SourceFilename relativeToVRT="0">${segment.file}</SourceFilename>
       <SourceBand>1</SourceBand>
