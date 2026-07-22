@@ -1,196 +1,143 @@
 # Historical Syria Explorer
 
-**An AI-ready, open-source geospatial platform for browsing every publicly available historical satellite image over Syria — from the 1960s until today.**
+An open-source web platform for exploring the satellite imagery record of Syria, from declassified reconnaissance film of the 1960s to current high-resolution imagery.
 
-Type _"Hama Old City"_ and get the oldest available image, the newest, a timeline in between, side-by-side comparison, metadata, and links to the original archive products. Eventually: _"Show Al-Kilani Quarter before 2011"_ or _"Find the oldest image covering Aleppo Citadel"_ — answered automatically across every provider.
+Live application: https://triavision-ai.github.io/historical-syria-explorer/
 
-Built for reconstruction, heritage preservation, research, agriculture, and environmental analysis.
+## Purpose
 
-> This is **not** a GIS viewer and not another Leaflet map. It is a plugin-based imagery platform with a service layer designed to be driven by both humans and AI agents.
+This project was made for Syrians. Cities and landscapes have changed profoundly over the past decades, and much of that history exists only in scattered archives that are difficult for the public to reach. Historical Syria Explorer gathers the publicly available imagery record into one place, so that anyone -- residents, families in the diaspora, researchers, journalists, teachers, and reconstruction planners -- can see how a street, a neighbourhood, or a whole city has changed.
 
----
+The application is free to use, requires no account or registration, and works on any modern phone or computer.
 
-## Features (Version 1 — Viewer)
+This is an educational, non-commercial project under active development. It is at an early stage: parts of it work well, parts are incomplete, and it will take time to mature. Feedback and contributions are welcome.
 
-- 🛰 **Pure satellite map** — label-free imagery basemap. No street names, no place names, no Google UI.
-- 🔎 **Search Syria** — cities, villages, neighbourhoods (Arabic or English) or raw `lat, lon` coordinates, biased to Syria.
-- 🕰 **Timeline 1960 → 2026** — tap a year, get the best available scene for the current location.
-- 📚 **Multi-provider scene list** — one chronological list merged from every registered provider.
-- 🆚 **Compare mode** — swipe divider between the historical scene (left) and current imagery (right), plus an opacity blend slider.
-- 📄 **Metadata panel** — mission, capture date, resolution, footprint, license, raw provider metadata, and ordering/download links.
-- 📱 **Mobile-first, dark UI** — pinch zoom, bottom-sheet panels, safe-area aware; equally at home on desktop.
-- 🏛 **Seed historical data** — the declassified KH-7 GAMBIT scene `DZB00402700090H020001` over Hama (25 April 1966) ships as curated catalog metadata.
+## What it does today
 
-## Live imagery sources (no API keys required)
+- Search any city, town, or village in Syria, in Arabic or English, or by coordinates.
+- Browse a timeline from 1960 to the present; selecting a year loads the closest suitable image for the current location.
+- Compare any two dates with a swipe divider, or blend a historical image over the modern map with an opacity control.
+- Every scene shows its full metadata: mission, capture date, resolution, footprint, license, and a link to the original archive record.
 
-| Provider                                      | Coverage                 | Backend                                                                                         |
-| --------------------------------------------- | ------------------------ | ----------------------------------------------------------------------------------------------- |
-| **Landsat (USGS)**                            | 1972 → today, 30–60 m    | [LandsatLook STAC API](https://landsatlook.usgs.gov/stac-server) — public domain                |
-| **Sentinel-2 (Copernicus)**                   | 2015 → today, 10 m       | [Earth Search STAC on AWS](https://earth-search.aws.element84.com/v1) — free with attribution   |
-| **USGS Declassified** (CORONA/GAMBIT/HEXAGON) | 1960–1984, down to 0.6 m | Pre-harvested Syria-wide catalog (see below) or live [M2M API](https://m2m.cr.usgs.gov/) search |
-| **Google Earth Engine**                       | 1972 → today             | Provider prepared; activates with an OAuth client id (roadmap V3)                               |
+### Imagery sources
 
----
+| Source                                                          | Period                     | Resolution | Access                                                                                    |
+| --------------------------------------------------------------- | -------------------------- | ---------- | ----------------------------------------------------------------------------------------- |
+| USGS declassified reconnaissance film (CORONA, GAMBIT, HEXAGON) | 1960-1984                  | 0.6-9 m    | 8,564 scenes over Syria indexed; selected frames processed to full resolution (see below) |
+| Landsat (USGS/NASA)                                             | 1972-present               | 30-60 m    | Full archive, searched live                                                               |
+| Sentinel-2 (ESA Copernicus)                                     | 2015-present               | 10 m       | Full archive, searched live                                                               |
+| Esri World Imagery Wayback                                      | 2014-present               | ~0.5 m     | Dated basemap snapshots for all of Syria                                                  |
+| Maxar Open Data Program                                         | around the 2023 earthquake | ~0.4 m     | 1,422 scenes over northwest Syria                                                         |
+
+All sources are official and publicly licensed. The application uses no proprietary services, no scraped content, and no map labels; the interface shows imagery only.
+
+### Full-resolution historical film
+
+For selected cities, the original declassified film scans (2-3 GB per frame) are downloaded from the USGS archive, georeferenced, and rendered as sharp map tiles served directly by this repository. These scenes are marked "HD" in the scene list and are preferred automatically when a timeline year is selected. Processed so far, or in processing: Hama (1966), Homs and Damascus (1975), Deir ez-Zor (1964), Aleppo (1966), Latakia (1966), Raqqa (1973), Idlib (1973).
+
+Any of the 8,564 indexed frames can be processed the same way by running a single workflow, subject to hosting space. Frames that USGS has not yet digitized require a one-time scan request through EarthExplorer.
+
+## Known limitations
+
+Honesty about the current state matters more than marketing:
+
+- Georeferencing of historical film is approximate. Frames are aligned automatically from archive corner coordinates; an offset of tens to hundreds of meters is normal, and individual frames can require manual correction. Precise alignment is an ongoing, scene-by-scene effort.
+- Sharp imagery before 2011 is scarce. The free record between 1984 and 2013 is Landsat at 30 m resolution, which shows neighbourhoods but not buildings. High-resolution pre-war imagery exists only in commercial archives and may be added in the future if licensing is arranged.
+- Maxar high-resolution coverage is limited to the 2023 earthquake response area in the northwest.
+- Wayback snapshot dates are mosaic release dates; the underlying photography of a specific place may be somewhat older.
+- Full-resolution rendering of Sentinel-2 and Maxar scenes uses a public demonstration tile server and can be slow on first load.
+- The interface is currently in English. An Arabic interface is planned.
+- Very cloudy scenes appear in search results; the cloud percentage is shown for each scene.
 
 ## Architecture
 
-Everything is plugin-based. Providers, endpoints, cities and years are never hardcoded into components — they live in configuration and registries.
+The application is a static site (Vite, React, TypeScript, MapLibre GL JS, Tailwind CSS) with no backend of its own. Every imagery source is implemented as a plugin behind a single interface, and all external endpoints are configurable.
 
 ```
 src/
-├── components/          # Presentational + interactive UI
-│   ├── map/             # MapLibre canvas, label-free style, overlay, compare sync
-│   ├── search/          # Geocoding search box
-│   ├── timeline/        # Bottom year timeline
-│   ├── scenes/          # Scene list + metadata panel
-│   └── controls/        # Compare toggle, opacity slider
-├── pages/               # Page shells (HomePage)
-├── providers/           # ⭐ Imagery provider plugins
-│   ├── registry.ts      # ProviderRegistry (dependency injection)
-│   ├── stac/            # Generic STAC client + generic STAC provider
-│   ├── landsat/         # Landsat via LandsatLook STAC (config only)
-│   ├── sentinel/        # Sentinel-2 via Earth Search STAC (config only)
-│   ├── usgs/            # Declassified imagery: curated catalog + M2M client
-│   └── earthEngine/     # Earth Engine provider (auth-gated, V3)
-├── services/            # ⭐ Service layer — the future AI tool surface
-│   ├── sceneSearchService.ts   # Parallel fan-out across all providers
-│   └── geocodingService.ts     # Place/coordinate resolution (Nominatim)
-├── hooks/               # Zustand store + React hooks
-├── types/               # Unified data model (ImageScene, ImageryProvider, …)
-├── utils/               # bbox / date / http helpers
-└── config/              # App constants + ALL external endpoints (env-overridable)
+  components/       User interface (map, timeline, search, scene panels, compare)
+  pages/            Page composition
+  providers/        Imagery source plugins
+    registry.ts       Provider registry (dependency injection)
+    stac/             Generic STAC API client and provider base
+    landsat/          Landsat via the USGS LandsatLook STAC API
+    sentinel/         Sentinel-2 via Earth Search on AWS
+    usgs/             Declassified film: catalog, M2M client, local tiles
+    wayback/          Esri World Imagery Wayback snapshots
+    maxar/            Maxar Open Data Program
+    earthEngine/      Google Earth Engine (prepared, not yet active)
+  services/         Search fan-out and geocoding; the future AI tool surface
+  hooks/            Application state
+  types/            Unified data model (ImageScene, ImageryProvider)
+  utils/            Shared helpers
+  config/           Application constants and all external endpoints
+scripts/            Catalog harvesting and film processing pipeline
+.github/workflows/  Deployment and data pipelines
+public/catalog/     Static scene catalogs (declassified film, Maxar)
+public/tiles/       Full-resolution tiles for processed film frames
 ```
 
-### The provider contract
+Every provider implements the same contract -- search, load, metadata, capabilities, status -- and returns the same scene model. Adding a new source (for example Planet, Airbus, or OpenAerialMap) means implementing one class and registering it in one line; nothing else changes. A provider that is unconfigured or unreachable degrades to an explanatory status instead of breaking the application.
 
-Every imagery source implements one interface and registers itself in one place:
+### Data pipelines
 
-```ts
-interface ImageryProvider {
-  readonly id: string;
-  capabilities(): ProviderCapabilities; // what it can do, temporal range, auth needs
-  status(): Promise<ProviderStatus>; // ready / unconfigured / error
-  search(query: SceneSearchQuery): Promise<ImageScene[]>;
-  load(scene: ImageScene): Promise<SceneLayer | null>; // how to draw it on the map
-  metadata(sceneId: string): Promise<Record<string, unknown>>;
-}
+Three GitHub Actions workflows maintain the data, all runnable from the Actions tab:
+
+- Harvest USGS declassified catalog: indexes every declassified frame over Syria through the USGS M2M API (requires the repository secrets USGS_M2M_USERNAME and USGS_M2M_TOKEN; the archive is closed, so this rarely needs re-running).
+- Harvest Maxar Open Data catalog: indexes Maxar Open Data scenes over Syria (public data, no credentials).
+- Tile a declassified scene: downloads the original film scan for one frame, mosaics its segments, georeferences it, cuts XYZ tiles, and publishes them. Inputs: candidate entity ids, dataset, maximum zoom, and an optional manual corner-order override for frames whose automatic orientation detection needs correction.
+
+Credentials are used only inside these workflows. The published site is fully static and never handles secrets.
+
+## Running locally
+
+Requires Node.js 22 or later and pnpm.
+
 ```
-
-Every provider returns the **same data model**:
-
-```ts
-interface ImageScene {
-  id;
-  provider;
-  mission;
-  captureDate;
-  resolution;
-  bounds;
-  thumbnail;
-  downloadUrl;
-  previewUrl;
-  metadata;
-  license;
-  geometry;
-}
-```
-
-Adding Maxar, Planet, Airbus, NASA or OpenAerialMap later means implementing `ImageryProvider` and adding one line to `src/providers/index.ts`. Nothing else changes.
-
-### Design principles
-
-- **Plugin everything** — providers are injected via `ProviderRegistry`; UI only sees the unified model.
-- **Graceful degradation** — a failing or unconfigured provider becomes a per-provider outcome, never a broken search. The app never stops because one provider is unavailable.
-- **Configuration over code** — every endpoint and credential comes from `src/config/` and Vite env vars (`.env.example`).
-- **AI-ready service layer** — `SceneSearchService`, `GeocodingService` and the registry form a typed tool surface that LLM function-calling (Claude, GPT, Gemini) will drive in Version 4: search provider → zoom → timeline → download → compare.
-- **Strict quality** — strict TypeScript (`exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`), ESLint, Prettier, Vitest.
-
----
-
-## Installation
-
-Requires Node 22+ and [pnpm](https://pnpm.io).
-
-```bash
 git clone https://github.com/Triavision-ai/historical-syria-explorer.git
 cd historical-syria-explorer
 pnpm install
-pnpm dev            # http://localhost:5173
+pnpm dev
 ```
 
-Other scripts:
+Additional commands: `pnpm build` (production build), `pnpm test` (unit tests), `pnpm lint`, `pnpm format`. Optional environment variables are documented in `.env.example`; the application is fully functional without any of them.
 
-```bash
-pnpm build          # type-check + production build to dist/
-pnpm preview        # serve the production build
-pnpm test           # vitest unit tests
-pnpm lint           # eslint
-pnpm format         # prettier
-```
+## Deployment
 
-### Optional credentials
-
-Copy `.env.example` to `.env.local`. The app is fully functional without credentials; adding them unlocks more archives:
-
-- `VITE_USGS_M2M_USERNAME` / `VITE_USGS_M2M_TOKEN` — live search of the complete USGS declassified archive (free account: [ERS registration](https://ers.cr.usgs.gov/register), token: [app token generator](https://ers.cr.usgs.gov/password/appgenerate)).
-- `VITE_EE_CLIENT_ID` — Google Earth Engine OAuth client (V3).
-- `VITE_TITILER` — a [TiTiler](https://developmentseed.org/titiler/) instance to render full-resolution Cloud-Optimized GeoTIFFs as map tiles instead of browse previews.
-
-### Syria-wide declassified catalog (one-time harvest)
-
-The declassified archive is **closed** — no scene has been added since 1984. That makes a one-time harvest possible: `scripts/harvest-declass.mjs` pages through the M2M API for all three declass datasets over Syria and writes `public/catalog/declass-syria.json`, including official USGS browse-image URLs. Once committed, **every visitor gets automatic, credential-free 1960s–80s coverage for all of Syria**, with browse previews draped on the map.
-
-To generate it:
-
-1. Create a free USGS account ([register](https://ers.cr.usgs.gov/register)), request M2M access ([profile → access](https://ers.cr.usgs.gov/profile/access)), and generate an application token ([token generator](https://ers.cr.usgs.gov/password/appgenerate)).
-2. Either run locally — `USGS_M2M_USERNAME=you USGS_M2M_TOKEN=xxx node scripts/harvest-declass.mjs` — and commit the JSON, **or** add `USGS_M2M_USERNAME` / `USGS_M2M_TOKEN` as repository secrets and run the **"Harvest USGS declassified catalog"** workflow from the Actions tab. The workflow commits the catalog to `main`, which redeploys the site automatically.
-
-Credentials are only used at harvest time; the deployed site never sees them.
-
-## GitHub Pages deployment
-
-Deployment is automated: `.github/workflows/deploy.yml` builds and publishes `dist/` to GitHub Pages on every push to `main`.
-
-One-time setup: repository **Settings → Pages → Build and deployment → Source → GitHub Actions**.
-
-The site is served at `https://triavision-ai.github.io/historical-syria-explorer/` (the Vite `base` in `vite.config.ts` must match this path).
-
----
-
-## Licensing & data policy
-
-- Application code: **MIT**.
-- Landsat & declassified imagery: **US public domain** (USGS).
-- Sentinel-2: free to use with **Copernicus attribution**.
-- Basemap tiles: Esri World Imagery, used with the required attribution.
-- The app **never scrapes websites and never embeds proprietary imagery**. Declassified film scenes (e.g. the 1966 KH-7 Hama scene) are represented by their official metadata with ordering links into USGS EarthExplorer until authorized digital assets or an M2M download pipeline exist — this limitation is by design, not by accident.
+Every push to `main` builds and deploys the site to GitHub Pages through `.github/workflows/deploy.yml`. The Vite `base` path in `vite.config.ts` must match the repository name.
 
 ## Roadmap
 
-| Version                      | Scope                                                                                                           |
-| ---------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| **V1 — Viewer** ✅           | Map, search, timeline, scene list, metadata, compare                                                            |
-| **V2 — USGS integration**    | Authenticated M2M search + browse/download pipeline for declassified imagery                                    |
-| **V3 — Earth Engine**        | OAuth sign-in, Landsat/Sentinel collections rendered server-side                                                |
-| **V4 — AI Search**           | Natural-language queries ("Show Al-Kilani Quarter before 2011") via LLM function-calling over the service layer |
-| **V5 — Change detection**    | Automatic diffing between epochs                                                                                |
-| **V6 — Building extraction** | Historical building footprints from imagery                                                                     |
-| **V7 — Time Machine**        | Continuous morphing timeline of any place in Syria                                                              |
-
-## Development
-
-- `src/providers/` is the extension point — see `StacImageryProvider` for how a full provider can be pure configuration.
-- State lives in a single Zustand store (`src/hooks/useExplorerStore.ts`); components stay thin.
-- The map is MapLibre GL JS with a hand-written raster style — deliberately no third-party style, no labels.
-- Keep commits small, one feature per commit.
+1. Viewer with multi-source search, timeline, and comparison -- done.
+2. Full-resolution processing of declassified film for major cities -- in progress.
+3. Scene-by-scene georeferencing refinement with manual control points.
+4. Arabic interface.
+5. Google Earth Engine integration.
+6. Natural-language search through an AI service layer ("show Al-Kilani quarter before 2011").
+7. Automatic change detection between epochs.
+8. Dedicated tile hosting as the collection outgrows repository storage.
 
 ## Contributing
 
-Contributions are very welcome — providers, translations (Arabic UI), curated declassified catalogs, tiling infrastructure:
+Contributions are welcome: new providers, georeferencing corrections, Arabic translation, curated scene selections, and testing from inside Syria are all valuable.
 
-1. Fork and create a feature branch.
-2. `pnpm lint && pnpm test && pnpm build` must pass.
-3. New providers must implement `ImageryProvider`, return the unified `ImageScene` model, and degrade gracefully when unconfigured.
+1. Fork the repository and create a feature branch.
+2. Ensure `pnpm lint`, `pnpm test`, and `pnpm build` pass.
+3. New providers must implement the `ImageryProvider` interface, return the unified scene model, and degrade gracefully when unconfigured.
 4. Open a pull request with a clear description.
 
-If something cannot legally be implemented (licensing, imagery rights), implement the architecture and document the limitation — never block the rest of the platform.
+If something cannot legally be implemented, implement the architecture, document the limitation, and continue; the project never depends on any single source.
+
+## License and data policy
+
+- Application code: MIT License.
+- Landsat and declassified imagery: United States public domain.
+- Sentinel-2: Copernicus data, free to use with attribution.
+- Esri World Imagery and Wayback: used under Esri's terms with attribution.
+- Maxar Open Data: Creative Commons BY-NC 4.0, non-commercial with attribution.
+
+The project never embeds imagery it has no right to redistribute. Attributions are displayed in the application.
+
+## Acknowledgements
+
+This project stands on public archives and open infrastructure maintained by the U.S. Geological Survey, NASA, the European Space Agency and the Copernicus programme, Esri, Maxar, Element 84, Development Seed, OpenStreetMap contributors, and the SpaceFromSpace project, whose hand-georeferenced work demonstrated what the declassified record can show.
