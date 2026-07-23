@@ -10,16 +10,11 @@ export const DEFAULT_LOCATION: { name: string; center: GeoPoint; zoom: number } 
   zoom: 14,
 };
 
-/** Years shown on the bottom timeline. */
-export const TIMELINE_YEARS: readonly number[] = [
-  1960, 1965, 1970, 1975, 1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020, 2026,
-];
-
 /**
- * When the user picks a timeline year, scenes within this many years of the
- * pick are considered candidates; the closest capture wins.
+ * Cap (degrees) on the viewport-derived search bbox: zoomed out past
+ * country scale, searching the whole visible world helps nobody.
  */
-export const TIMELINE_MATCH_TOLERANCE_YEARS = 6;
+export const MAX_SEARCH_BBOX_SPAN = 8;
 
 export const MAP_CONFIG = {
   minZoom: 5,
