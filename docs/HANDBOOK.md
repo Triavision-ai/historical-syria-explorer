@@ -279,6 +279,26 @@ variables → Actions:
 | `R2_ACCOUNT_ID` | Cloudflare account ID | Cloudflare dashboard, right sidebar |
 | `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | R2 API token pair (Object Read & Write) | Cloudflare → R2 → API tokens → **Create Account API token** |
 
+One-time bucket setting that the pipeline CANNOT do for you: the bucket's
+**CORS policy** (browsers refuse to draw map tiles from a bucket without
+it, so the site silently shows no film). An Object Read & Write token may
+not change bucket settings, so set it once by hand: Cloudflare → R2 →
+`syria-tiles` → Settings → CORS policy →
+
+```json
+[
+  {
+    "AllowedOrigins": ["*"],
+    "AllowedMethods": ["GET", "HEAD"],
+    "AllowedHeaders": ["*"],
+    "MaxAgeSeconds": 86400
+  }
+]
+```
+
+This grants read-only browser access to already-public files; it never
+needs touching again.
+
 Rotation = create the new credential at the provider, overwrite the GitHub
 secret, delete the old credential. Nothing in the repository changes.
 Rotate immediately if a value was ever pasted into a chat, e-mail, or
