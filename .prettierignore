@@ -1,3 +1,7 @@
 dist
 coverage
 pnpm-lock.yaml
+package-lock.json
+# CI-owned registries and harvested catalogs - workflows write these
+public/tiles/*.json
+public/catalog/*.json

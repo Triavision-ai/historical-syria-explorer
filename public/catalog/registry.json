@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "note": "Scene registry: one record per scene admitted to the production line (docs/DATA_PIPELINE.md). Written by workflows once the assessment pipeline lands; hand-backfilled 2026-07-23 for the seven scenes published before the registry existed.",
+  "scenes": {
+    "DZB00402700090H020001": {
+      "place": "Hama",
+      "status": "published",
+      "source": {
+        "provider": "usgs-declass",
+        "dataset": "declassii",
+        "platform": "KH-7 GAMBIT",
+        "license": "public-domain"
+      },
+      "capture": { "date": "1966-04-25", "nominalResolutionM": 0.6 },
+      "quality": {
+        "score": null,
+        "method": null,
+        "assessedAt": null,
+        "humanVerdict": "usable"
+      },
+      "alignment": {
+        "method": "human",
+        "needsHuman": false,
+        "verifiedBy": "Ahmad",
+        "verifiedAt": "2026-07-22",
+        "notes": "Scan mirrored; mirror + rotate -118deg + scale 1.071 over landmark calibration"
+      },
+      "processing": { "tiled": true, "maxZoom": 18, "storage": "r2", "lossless": true }
+    },
+    "DZB1206-500074L008001": {
+      "place": "Aleppo",
+      "status": "needs-alignment",
+      "source": {
+        "provider": "usgs-declass",
+        "dataset": "declassii",
+        "platform": "KH-9 HEXAGON",
+        "license": "public-domain"
+      },
+      "capture": { "date": "1973-08-01", "nominalResolutionM": 6 },
+      "quality": { "score": null, "method": null, "assessedAt": null, "humanVerdict": "usable" },
+      "alignment": { "method": "archive-corners", "needsHuman": true },
+      "processing": { "tiled": true, "maxZoom": 16, "storage": "r2", "lossless": true }
+    },
+    "DZB1206-500016L011001": {
+      "place": "Latakia",
+      "status": "needs-alignment",
+      "source": {
+        "provider": "usgs-declass",
+        "dataset": "declassii",
+        "platform": "KH-9 HEXAGON",
+        "license": "public-domain"
+      },
+      "capture": { "date": "1973-07-18", "nominalResolutionM": 6 },
+      "quality": { "score": null, "method": null, "assessedAt": null, "humanVerdict": "usable" },
+      "alignment": { "method": "archive-corners", "needsHuman": true },
+      "processing": { "tiled": true, "maxZoom": 16, "storage": "r2", "lossless": true }
+    },
+    "DZB1210-500023L001001": {
+      "place": "Idlib",
+      "status": "needs-alignment",
+      "source": {
+        "provider": "usgs-declass",
+        "dataset": "declassii",
+        "platform": "KH-9 HEXAGON",
+        "license": "public-domain"
+      },
+      "capture": { "date": "1975-06-13", "nominalResolutionM": 6 },
+      "quality": { "score": null, "method": null, "assessedAt": null, "humanVerdict": "usable" },
+      "alignment": { "method": "archive-corners", "needsHuman": true },
+      "processing": { "tiled": true, "maxZoom": 16, "storage": "r2", "lossless": true }
+    },
+    "DZB1205-500082L008001": {
+      "place": "Deir ez-Zor",
+      "status": "needs-alignment",
+      "source": {
+        "provider": "usgs-declass",
+        "dataset": "declassii",
+        "platform": "KH-9 HEXAGON",
+        "license": "public-domain"
+      },
+      "capture": { "date": "1973-03-28", "nominalResolutionM": 6 },
+      "quality": { "score": null, "method": null, "assessedAt": null, "humanVerdict": "usable" },
+      "alignment": { "method": "archive-corners", "needsHuman": true },
+      "processing": { "tiled": true, "maxZoom": 16, "storage": "r2", "lossless": true }
+    },
+    "DZB1210-500184L001001": {
+      "place": "Homs / Damascus",
+      "status": "needs-alignment",
+      "source": {
+        "provider": "usgs-declass",
+        "dataset": "declassii",
+        "platform": "KH-9 HEXAGON",
+        "license": "public-domain"
+      },
+      "capture": { "date": "1975-07-24", "nominalResolutionM": 6 },
+      "quality": { "score": null, "method": null, "assessedAt": null, "humanVerdict": "usable" },
+      "alignment": { "method": "archive-corners", "needsHuman": true },
+      "processing": { "tiled": true, "maxZoom": 15, "storage": "r2", "lossless": true }
+    },
+    "D3C1209-400566A011": {
+      "place": "Raqqa / Euphrates valley",
+      "status": "needs-alignment",
+      "source": {
+        "provider": "usgs-declass",
+        "dataset": "declassiii",
+        "platform": "KH-9 HEXAGON mapping camera",
+        "license": "public-domain"
+      },
+      "capture": { "date": "1975-01-25", "nominalResolutionM": 6 },
+      "quality": { "score": null, "method": null, "assessedAt": null, "humanVerdict": "usable" },
+      "alignment": { "method": "archive-corners", "needsHuman": true },
+      "processing": { "tiled": true, "maxZoom": 15, "storage": "r2", "lossless": true }
+    }
+  }
+}
