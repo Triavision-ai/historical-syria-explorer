@@ -60,7 +60,15 @@ export function ExplorerMap() {
     if (!mainMap) return;
     const onMoveEnd = () => {
       const c = mainMap.getCenter();
-      useExplorerStore.getState().mapMoved({ lon: c.lng, lat: c.lat });
+      const b = mainMap.getBounds();
+      useExplorerStore
+        .getState()
+        .mapMoved({ lon: c.lng, lat: c.lat }, [
+          b.getWest(),
+          b.getSouth(),
+          b.getEast(),
+          b.getNorth(),
+        ]);
     };
     mainMap.on('moveend', onMoveEnd);
     return () => {

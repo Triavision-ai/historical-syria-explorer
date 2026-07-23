@@ -21,6 +21,13 @@ export function formatCaptureDate(isoDate: string): string {
   });
 }
 
+/** Short month + year ("May 1966") — the timeline's event label. */
+export function formatMonthYear(isoDate: string): string {
+  const date = new Date(isoDate);
+  if (Number.isNaN(date.getTime())) return isoDate;
+  return date.toLocaleDateString('en-GB', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+}
+
 /** Build an ISO interval string ("start/end") as used by STAC datetime search. */
 export function isoInterval(from?: string, to?: string): string | undefined {
   if (!from && !to) return undefined;
