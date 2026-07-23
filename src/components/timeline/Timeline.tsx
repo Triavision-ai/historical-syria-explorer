@@ -14,13 +14,18 @@ export function Timeline() {
   const selectYear = useExplorerStore((state) => state.selectYear);
 
   const yearsWithData = useMemo(() => {
+    // A dot promises the user an actual picture — count only scenes that
+    // can render on the map (sharp tiles or a browse preview), not
+    // metadata-only archive records.
+    const displayable = scenes.filter(
+      (scene) =>
+        scene.captureDate && (scene.metadata['displayable'] === true || scene.previewUrl),
+    );
     const available = new Set<number>();
     for (const year of TIMELINE_YEARS) {
       if (
-        scenes.some(
-          (scene) =>
-            scene.captureDate &&
-            yearDistance(scene.captureDate, year) <= TIMELINE_MATCH_TOLERANCE_YEARS,
+        displayable.some(
+          (scene) => yearDistance(scene.captureDate, year) <= TIMELINE_MATCH_TOLERANCE_YEARS,
         )
       ) {
         available.add(year);
