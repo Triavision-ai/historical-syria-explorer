@@ -29,15 +29,45 @@ interface DeclassCatalogFile {
 
 const DATASET_LABELS: Record<string, string> = {
   declassi: 'Declass 1 (1960 to 1972)',
+  corona2: 'Declass 1 (1960 to 1972)',
   declassii: 'Declass 2 (1963 to 1980)',
   declassiii: 'Declass 3 (1971 to 1984)',
 };
 
 const MISSION_BY_DATASET: Record<string, string> = {
   declassi: 'CORONA / ARGON / LANYARD',
+  corona2: 'CORONA / ARGON / LANYARD',
   declassii: 'KH-7 GAMBIT / KH-9 HEXAGON',
   declassiii: 'KH-9 HEXAGON mapping camera',
 };
+
+/**
+ * The Declass 2 dataset mixes two platforms, and the harvest stamps its
+ * combined label onto every record. The entity id tells them apart
+ * (handbook §3): DZB004… frames are KH-7 GAMBIT missions 4001–4054,
+ * DZB12… frames are KH-9 HEXAGON missions 1201+.
+ */
+function declassMission(record: DeclassCatalogRecord): string {
+  const generic = !record.mission || record.mission === MISSION_BY_DATASET[record.dataset];
+  if (!generic && record.mission) return record.mission;
+  if (record.entityId.startsWith('DZB004')) return 'KH-7 GAMBIT';
+  if (record.entityId.startsWith('DZB12')) return 'KH-9 HEXAGON';
+  return record.mission ?? MISSION_BY_DATASET[record.dataset] ?? 'Declassified reconnaissance';
+}
+
+/**
+ * The harvest emits "YYYY-MM-DD HH:MM:SS-05"; Safari's Date parser
+ * rejects the space separator and the two-digit offset, which would break
+ * timeline grouping on iPhones. Normalize to strict ISO 8601.
+ */
+export function toIsoCaptureDate(value: string): string {
+  const match = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})(?:([+-]\d{2})(?::?(\d{2}))?)?$/.exec(
+    value,
+  );
+  if (!match) return value;
+  const offset = match[3] ? `${match[3]}:${match[4] ?? '00'}` : 'Z';
+  return `${match[1]}T${match[2]}${offset}`;
+}
 
 let catalogPromise: Promise<ImageScene[]> | null = null;
 
@@ -73,8 +103,8 @@ function toScene(record: DeclassCatalogRecord): ImageScene | null {
   return {
     id: `${USGS_DECLASS_PROVIDER_ID}:${record.entityId}`,
     provider: USGS_DECLASS_PROVIDER_ID,
-    mission: record.mission ?? MISSION_BY_DATASET[record.dataset] ?? 'Declassified reconnaissance',
-    captureDate: record.captureDate,
+    mission: declassMission(record),
+    captureDate: toIsoCaptureDate(record.captureDate),
     ...(record.resolution !== undefined ? { resolution: record.resolution } : {}),
     bounds,
     ...(record.thumbnailUrl ? { thumbnail: record.thumbnailUrl } : {}),

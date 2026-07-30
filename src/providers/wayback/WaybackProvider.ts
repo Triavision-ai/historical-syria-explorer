@@ -53,8 +53,8 @@ export class WaybackProvider implements ImageryProvider {
     return { state: 'ready' };
   }
 
-  async search(query: SceneSearchQuery, signal?: AbortSignal): Promise<ImageScene[]> {
-    const releases = await this.loadReleases(signal);
+  async search(query: SceneSearchQuery, _signal?: AbortSignal): Promise<ImageScene[]> {
+    const releases = await this.loadReleases();
     const scenes: ImageScene[] = [];
     for (const [releaseNum, entry] of releases) {
       const date = RELEASE_DATE_PATTERN.exec(entry.itemTitle)?.[1];
@@ -125,11 +125,18 @@ export class WaybackProvider implements ImageryProvider {
     return entry ? { ...entry } : {};
   }
 
-  private loadReleases(signal?: AbortSignal): Promise<Map<string, WaybackConfigEntry>> {
-    this.releasesPromise ??= fetchJson<Record<string, WaybackConfigEntry>>(
-      ENDPOINTS.waybackConfig,
-      signal ? { signal } : undefined,
-    ).then((config) => new Map(Object.entries(config)));
+  // The release index is session-global, so the cached fetch takes no
+  // per-search AbortSignal: baking the first search's signal in meant one
+  // early pan aborted the fetch and the cached rejection killed the
+  // provider for the whole session. A failed fetch clears the cache so
+  // the next search retries.
+  private loadReleases(): Promise<Map<string, WaybackConfigEntry>> {
+    this.releasesPromise ??= fetchJson<Record<string, WaybackConfigEntry>>(ENDPOINTS.waybackConfig)
+      .then((config) => new Map(Object.entries(config)))
+      .catch((error: unknown) => {
+        this.releasesPromise = null;
+        throw error;
+      });
     return this.releasesPromise;
   }
 }
