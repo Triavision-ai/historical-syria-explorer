@@ -7,7 +7,9 @@ import type {
   SceneSearchQuery,
 } from '@/types';
 import { ENDPOINTS } from '@/config/providers.config';
+import { DEFAULT_SEARCH_LIMIT } from '@/config/app.config';
 import { bboxContains, bboxIntersects, geometryBounds } from '@/utils/bbox';
+import { capSceneResults } from '@/utils/scene';
 
 interface MaxarCatalogRecord {
   id: string;
@@ -73,7 +75,7 @@ export class MaxarOpenDataProvider implements ImageryProvider {
 
   async search(query: SceneSearchQuery): Promise<ImageScene[]> {
     const scenes = await this.loadCatalog();
-    return scenes.filter((scene) => {
+    const matches = scenes.filter((scene) => {
       if (query.dateFrom && scene.captureDate < query.dateFrom) return false;
       if (query.dateTo && scene.captureDate > query.dateTo) return false;
       switch (query.spatial.kind) {
@@ -88,6 +90,7 @@ export class MaxarOpenDataProvider implements ImageryProvider {
           );
       }
     });
+    return capSceneResults(matches, query.limit ?? DEFAULT_SEARCH_LIMIT);
   }
 
   async load(scene: ImageScene): Promise<SceneLayer | null> {

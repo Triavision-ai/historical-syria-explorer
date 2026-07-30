@@ -34,12 +34,12 @@ export interface StacSearchBody {
 export function buildStacSearchBody(
   query: SceneSearchQuery,
   collections: string[],
-  options: { cloudCoverField?: string; defaultLimit: number },
+  options: { cloudCoverField?: string; defaultLimit: number; sortDirection?: 'asc' | 'desc' },
 ): StacSearchBody {
   const body: StacSearchBody = {
     collections,
     limit: query.limit ?? options.defaultLimit,
-    sortby: [{ field: 'properties.datetime', direction: 'asc' }],
+    sortby: [{ field: 'properties.datetime', direction: options.sortDirection ?? 'asc' }],
   };
 
   switch (query.spatial.kind) {

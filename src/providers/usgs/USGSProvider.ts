@@ -7,8 +7,9 @@ import type {
   SceneSearchQuery,
 } from '@/types';
 import { bboxContains, bboxIntersects, geometryBounds } from '@/utils/bbox';
+import { capSceneResults } from '@/utils/scene';
 import { ENDPOINTS, corsSafeImageUrl } from '@/config/providers.config';
-import { SYRIA_BBOX } from '@/config/app.config';
+import { SYRIA_BBOX, DEFAULT_SEARCH_LIMIT } from '@/config/app.config';
 import { M2MClient } from './m2mClient';
 import type { M2MSceneResult } from './m2mClient';
 import { DECLASS_SCENES, USGS_DECLASS_PROVIDER_ID } from './declassCatalog';
@@ -153,7 +154,7 @@ export class USGSProvider implements ImageryProvider {
         ? { ...scene, metadata: { ...scene.metadata, tiled: true, displayable: true } }
         : scene;
     });
-    return withFlags.filter((scene) => {
+    const matches = withFlags.filter((scene) => {
       if (query.dateFrom && scene.captureDate < query.dateFrom) return false;
       if (query.dateTo && scene.captureDate > query.dateTo) return false;
       switch (query.spatial.kind) {
@@ -168,6 +169,7 @@ export class USGSProvider implements ImageryProvider {
           );
       }
     });
+    return capSceneResults(matches, query.limit ?? DEFAULT_SEARCH_LIMIT);
   }
 
   private toScene(record: M2MSceneResult, dataset: string): ImageScene {
