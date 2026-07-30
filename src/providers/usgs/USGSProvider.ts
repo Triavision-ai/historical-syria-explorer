@@ -7,7 +7,7 @@ import type {
   SceneSearchQuery,
 } from '@/types';
 import { bboxContains, bboxIntersects, geometryBounds } from '@/utils/bbox';
-import { ENDPOINTS, CREDENTIALS, corsSafeImageUrl } from '@/config/providers.config';
+import { ENDPOINTS, corsSafeImageUrl } from '@/config/providers.config';
 import { SYRIA_BBOX } from '@/config/app.config';
 import { M2MClient } from './m2mClient';
 import type { M2MSceneResult } from './m2mClient';
@@ -22,22 +22,19 @@ const DECLASS_DATASETS = ['declassi', 'declassii', 'declassiii'];
  * USGS declassified imagery provider (CORONA KH-4, GAMBIT KH-7, HEXAGON KH-9,
  * 1960–1984).
  *
- * Two modes:
- *  - Without credentials (default): serves the pre-harvested Syria-wide
- *    catalog (public/catalog/declass-syria.json, built once from the M2M
- *    API by scripts/harvest-declass.mjs) merged with the curated seed
- *    scenes. The declassified archive is closed (1960–1984), so a one-time
- *    harvest gives permanent coverage with no runtime credentials.
- *  - With M2M credentials (VITE_USGS_M2M_USERNAME/TOKEN): live scene-search
- *    against the M2M API across all declass datasets.
+ * In the browser this always serves the pre-harvested Syria-wide catalog
+ * (public/catalog/declass-syria.json, built once from the M2M API by
+ * scripts/harvest-declass.mjs) merged with the curated seed scenes. The
+ * declassified archive is closed (1960–1984), so a one-time harvest gives
+ * permanent coverage with no runtime credentials — and M2M credentials must
+ * never reach the client bundle (they live only in GitHub Actions secrets).
+ * The live-M2M mode remains injectable for tests and trusted tooling.
  */
 export class USGSProvider implements ImageryProvider {
   readonly id = USGS_DECLASS_PROVIDER_ID;
   private readonly m2m: M2MClient;
 
-  constructor(
-    m2m = new M2MClient(ENDPOINTS.usgsM2M, CREDENTIALS.usgsM2MUsername, CREDENTIALS.usgsM2MToken),
-  ) {
+  constructor(m2m = new M2MClient(ENDPOINTS.usgsM2M, '', '')) {
     this.m2m = m2m;
   }
 
@@ -67,7 +64,7 @@ export class USGSProvider implements ImageryProvider {
       state: 'unconfigured',
       reason:
         'Running on the curated seed catalog only. Generate the Syria-wide ' +
-        'catalog with scripts/harvest-declass.mjs (or set VITE_USGS_M2M_* for live search).',
+        'catalog with scripts/harvest-declass.mjs.',
     };
   }
 
