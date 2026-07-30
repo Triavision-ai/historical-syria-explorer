@@ -43,6 +43,18 @@ the agreed backlog.
   find-digitized.yml (which frames near a point are downloadable),
   harvest-declass / harvest-maxar (catalogs), deploy.yml, secret-scan.yml.
 
+## State as of 2026-07-30
+
+- Full audit (own multi-agent review + an external ChatGPT report)
+  fixed on main: workflow input injection closed, client M2M credential
+  path removed, search is submit-only (Nominatim policy), align-tool
+  token now session-only, compare-map destroy crash, Wayback cache
+  poisoning, per-frame KH-7/KH-9 labels, ISO capture dates (Safari),
+  static-catalog result caps, STAC bucket sort bias, overlay
+  attribution. Open by design: registry-driven publication gating,
+  Wayback publication-date modeling, accuracy classes (see the audit
+  remediation plan in chat history and docs/DATA_PIPELINE.md).
+
 ## State as of 2026-07-23
 
 - Seven cities live at full native resolution from R2:

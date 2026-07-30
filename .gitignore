@@ -1,5 +1,7 @@
 # Dependencies
 node_modules
+# The project uses pnpm (pnpm-lock.yaml); a stray npm lockfile only drifts.
+package-lock.json
 
 # Build output
 dist
