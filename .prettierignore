@@ -1,11 +1,13 @@
 dist
 coverage
 pnpm-lock.yaml
+package-lock.json
 
-# CI-owned registries: the tiling pipeline writes these with its own
+# CI-owned data: the tiling and harvest workflows write these with their own
 # JSON.stringify formatting on every run. Letting prettier reformat them
 # guarantees a conflict with the next pipeline commit.
 public/tiles/
+public/catalog/
 
 # Hand-formatted standalone documents. Prettier's opinion adds nothing here
 # and its reflowing churn buries real edits.
