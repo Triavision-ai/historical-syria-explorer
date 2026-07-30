@@ -20,14 +20,15 @@ export function WelcomeHint() {
         <li className="flex gap-2">
           <span className="font-bold text-accent-400">1.</span>
           <span>
-            <strong>Search</strong> any place in Syria — city, village, or coordinates.
+            <strong>Pan and zoom</strong> to any place in Syria — or search for a city, village, or
+            coordinates.
           </span>
         </li>
         <li className="flex gap-2">
           <span className="font-bold text-accent-400">2.</span>
           <span>
-            Tap a <strong>year</strong> on the bottom timeline — the clearest image near that year
-            appears on the map. Or pick one yourself from <strong>Scenes</strong>.
+            The bottom timeline shows the <strong>real dates</strong> of imagery captured here. Tap
+            a date to see that image. Or pick one yourself from <strong>Scenes</strong>.
           </span>
         </li>
         <li className="flex gap-2">

@@ -1,69 +1,87 @@
-import { useMemo } from 'react';
-import { TIMELINE_YEARS, TIMELINE_MATCH_TOLERANCE_YEARS } from '@/config/app.config';
+import { useEffect, useMemo, useRef } from 'react';
 import { useExplorerStore } from '@/hooks/useExplorerStore';
-import { yearDistance } from '@/utils/date';
+import { timelineEvents, timelineEventKey } from '@/utils/timelineEvents';
+import { formatMonthYear } from '@/utils/date';
 
 /**
- * Bottom timeline (1960 → 2026). Clicking a year loads the best available
- * scene near that year for the current location. A dot marks years with
- * at least one candidate scene.
+ * Bottom timeline. No fixed year ruler: as the user pans — Google Maps
+ * style, no search needed — it rebuilds from the imagery actually found at
+ * the current view, one marker per capture event, labeled with the image's
+ * real date. Tapping a marker loads that event's best scene.
  */
 export function Timeline() {
   const scenes = useExplorerStore((state) => state.scenes);
-  const activeYear = useExplorerStore((state) => state.activeYear);
-  const selectYear = useExplorerStore((state) => state.selectYear);
+  const searchStatus = useExplorerStore((state) => state.searchStatus);
+  const selectedScene = useExplorerStore((state) => state.selectedScene);
+  const selectScene = useExplorerStore((state) => state.selectScene);
+  const listRef = useRef<HTMLOListElement>(null);
 
-  const yearsWithData = useMemo(() => {
-    // A dot promises the user an actual picture — count only scenes that
-    // can render on the map (sharp tiles or a browse preview), not
-    // metadata-only archive records.
-    const displayable = scenes.filter(
-      (scene) => scene.captureDate && (scene.metadata['displayable'] === true || scene.previewUrl),
-    );
-    const available = new Set<number>();
-    for (const year of TIMELINE_YEARS) {
-      if (
-        displayable.some(
-          (scene) => yearDistance(scene.captureDate, year) <= TIMELINE_MATCH_TOLERANCE_YEARS,
-        )
-      ) {
-        available.add(year);
-      }
-    }
-    return available;
-  }, [scenes]);
+  const events = useMemo(() => timelineEvents(scenes), [scenes]);
+  const activeKey = selectedScene ? timelineEventKey(selectedScene) : null;
+
+  // Keep the active event visible as selection or location changes.
+  useEffect(() => {
+    listRef.current
+      ?.querySelector('[aria-pressed="true"]')
+      ?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+  }, [activeKey, events]);
 
   return (
     <nav
       aria-label="Imagery timeline"
       className="pointer-events-auto rounded-xl border border-surface-600 bg-surface-900/90 shadow-lg backdrop-blur"
     >
-      <ol className="flex items-stretch gap-1 overflow-x-auto px-2 py-1.5 [scrollbar-width:none]">
-        {TIMELINE_YEARS.map((year) => {
-          const isActive = year === activeYear;
-          const hasData = yearsWithData.has(year);
-          return (
-            <li key={year} className="shrink-0">
-              <button
-                type="button"
-                onClick={() => void selectYear(year)}
-                aria-pressed={isActive}
-                className={`flex flex-col items-center rounded-lg px-2.5 py-1 text-xs font-medium transition-colors sm:px-3 ${
-                  isActive ? 'bg-accent-500 text-surface-950' : 'text-gray-300 hover:bg-surface-700'
-                }`}
-              >
-                <span>{year}</span>
-                <span
-                  aria-hidden
-                  className={`mt-0.5 h-1 w-1 rounded-full ${
-                    hasData ? (isActive ? 'bg-surface-950' : 'bg-amber-hl') : 'bg-transparent'
+      {events.length === 0 ? (
+        <p className="px-4 py-2.5 text-xs text-gray-400">
+          {searchStatus === 'loading'
+            ? 'Finding imagery for this view…'
+            : 'No dated imagery here yet — pan or zoom the map to explore.'}
+        </p>
+      ) : (
+        <ol
+          ref={listRef}
+          className="flex items-stretch gap-1 overflow-x-auto px-2 py-1.5 [scrollbar-width:none]"
+        >
+          {events.map((event) => {
+            const isActive = event.key === activeKey;
+            return (
+              <li key={event.key} className="shrink-0">
+                <button
+                  type="button"
+                  onClick={() => void selectScene(event.scene)}
+                  aria-pressed={isActive}
+                  className={`flex flex-col items-center rounded-lg px-2.5 py-1 text-xs font-medium transition-colors sm:px-3 ${
+                    isActive
+                      ? 'bg-accent-500 text-surface-950'
+                      : 'text-gray-300 hover:bg-surface-700'
                   }`}
-                />
-              </button>
-            </li>
-          );
-        })}
-      </ol>
+                >
+                  <span className="whitespace-nowrap">
+                    {formatMonthYear(event.scene.captureDate)}
+                  </span>
+                  <span
+                    className={`whitespace-nowrap text-[9px] font-semibold ${
+                      isActive
+                        ? 'text-surface-950/80'
+                        : event.hd
+                          ? 'text-amber-hl'
+                          : 'text-gray-500'
+                    }`}
+                  >
+                    {shortMission(event.scene.mission)}
+                    {event.hd ? ' · HD' : ''}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      )}
     </nav>
   );
+}
+
+/** "KH-9 HEXAGON" → "KH-9"; single-word missions pass through. */
+function shortMission(mission: string): string {
+  return mission.split(' ')[0] ?? mission;
 }
