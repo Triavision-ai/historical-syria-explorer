@@ -1,16 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import type { Place } from '@/types';
 import { geocodingService } from '@/services';
-import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useExplorerStore } from '@/hooks/useExplorerStore';
 
-const DEBOUNCE_MS = 400;
-const MIN_QUERY_LENGTH = 2;
 const PLACE_ZOOM = 13;
 
 /**
  * Free-text search: city, village, neighbourhood (Arabic or English) or raw
- * "lat, lon" coordinates. Results are biased to Syria.
+ * "lat, lon" coordinates, biased to Syria. Geocoding runs ONLY on explicit
+ * submit (Enter or the Go button) — the public Nominatim policy forbids
+ * autocomplete, and panning the map is the primary way to explore anyway.
  */
 export function SearchBox() {
   const goTo = useExplorerStore((state) => state.goTo);
@@ -18,32 +17,34 @@ export function SearchBox() {
   const [places, setPlaces] = useState<Place[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const debouncedText = useDebouncedValue(text, DEBOUNCE_MS);
+  const [noResults, setNoResults] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
-  useEffect(() => {
+  const submit = () => {
+    const query = text.trim();
+    if (query.length === 0 || loading) return;
     abortRef.current?.abort();
-    const query = debouncedText.trim();
-    if (query.length < MIN_QUERY_LENGTH) {
-      setPlaces([]);
-      setLoading(false);
-      return;
-    }
     const abort = new AbortController();
     abortRef.current = abort;
     setLoading(true);
+    setNoResults(false);
     geocodingService
       .search(query, abort.signal)
       .then((results) => {
         if (abort.signal.aborted) return;
-        setPlaces(results);
-        setOpen(true);
+        if (results.length === 1 && results[0]) {
+          choose(results[0]);
+        } else {
+          setPlaces(results);
+          setOpen(results.length > 0);
+          setNoResults(results.length === 0);
+        }
       })
       .catch(() => undefined)
       .finally(() => {
         if (!abort.signal.aborted) setLoading(false);
       });
-  }, [debouncedText]);
+  };
 
   const choose = (place: Place) => {
     setOpen(false);
@@ -63,20 +64,39 @@ export function SearchBox() {
         </svg>
         <input
           value={text}
-          onChange={(event) => setText(event.target.value)}
+          onChange={(event) => {
+            setText(event.target.value);
+            setNoResults(false);
+          }}
           onFocus={() => places.length > 0 && setOpen(true)}
           onKeyDown={(event) => {
-            if (event.key === 'Enter' && places[0]) choose(places[0]);
+            if (event.key === 'Enter') submit();
             if (event.key === 'Escape') setOpen(false);
           }}
           placeholder="Search Syria — city, village or 35.13, 36.76"
           aria-label="Search Syria"
+          enterKeyHint="search"
           className="w-full bg-transparent text-sm text-gray-100 placeholder-gray-500 outline-none"
         />
-        {loading && (
+        {loading ? (
           <div className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-surface-600 border-t-accent-400" />
+        ) : (
+          <button
+            type="button"
+            onClick={submit}
+            aria-label="Search"
+            className="shrink-0 rounded-lg bg-surface-700 px-2.5 py-1 text-xs font-semibold text-gray-200 hover:bg-surface-600"
+          >
+            Go
+          </button>
         )}
       </div>
+
+      {noResults && (
+        <p className="absolute top-full right-0 left-0 z-30 mt-2 rounded-xl border border-surface-600 bg-surface-900/95 px-4 py-2.5 text-xs text-gray-400 shadow-2xl backdrop-blur">
+          Nothing found in Syria for that search.
+        </p>
+      )}
 
       {open && places.length > 0 && (
         <ul className="absolute top-full right-0 left-0 z-30 mt-2 overflow-hidden rounded-xl border border-surface-600 bg-surface-900/95 shadow-2xl backdrop-blur">
@@ -94,6 +114,9 @@ export function SearchBox() {
               </button>
             </li>
           ))}
+          <li className="border-t border-surface-700/60 px-4 py-1.5 text-[10px] text-gray-600">
+            Search results © OpenStreetMap contributors (Nominatim)
+          </li>
         </ul>
       )}
     </div>

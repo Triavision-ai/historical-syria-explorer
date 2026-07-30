@@ -13,6 +13,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # The places input is untrusted text and must never be interpolated
+      # into a run script. Validate its shape first, with no secrets in
+      # scope, then pass it to the script through the environment.
+      - name: Validate input (no secrets in this step)
+        env:
+          PLACES: ${{ inputs.places }}
+        run: |
+          set -euf
+          for entry in $PLACES; do
+            [[ "$entry" =~ ^[A-Za-z0-9_-]+:-?[0-9]+(\.[0-9]+)?:-?[0-9]+(\.[0-9]+)?$ ]] \
+              || { echo "places rejected: '$entry' is not Name:lon:lat"; exit 1; }
+          done
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -20,4 +32,7 @@ jobs:
         env:
           USGS_M2M_USERNAME: ${{ secrets.USGS_M2M_USERNAME }}
           USGS_M2M_TOKEN: ${{ secrets.USGS_M2M_TOKEN }}
-        run: node scripts/find-digitized.mjs ${{ inputs.places }}
+          PLACES: ${{ inputs.places }}
+        run: |
+          set -f
+          node scripts/find-digitized.mjs $PLACES

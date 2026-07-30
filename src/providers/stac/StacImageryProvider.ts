@@ -77,12 +77,16 @@ export class StacImageryProvider implements ImageryProvider {
     const perQuery = Math.max(4, Math.ceil((query.limit ?? DEFAULT_SEARCH_LIMIT) / queries.length));
 
     const settled = await Promise.allSettled(
-      queries.map((subQuery) => {
+      queries.map((subQuery, index) => {
         const body = buildStacSearchBody(
           { ...subQuery, limit: perQuery },
           this.config.collections,
           {
             defaultLimit: DEFAULT_SEARCH_LIMIT,
+            // Alternate the sort per bucket: an always-ascending sort over a
+            // wide viewport returns only each bucket's earliest scenes from
+            // one orbital swath, leaving later years invisible.
+            sortDirection: index % 2 === 0 ? 'asc' : 'desc',
             ...(this.config.cloudCoverField
               ? { cloudCoverField: this.config.cloudCoverField }
               : {}),

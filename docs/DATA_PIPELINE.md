@@ -22,8 +22,8 @@ Each record answers five questions:
 
 | Block        | Question it answers                                              |
 | ------------ | ---------------------------------------------------------------- |
-| `source`     | Where did this picture come from, under what license?            |
-| `capture`    | When was it taken, by what platform, at what resolution?         |
+| `source`     | Where did it come from — provider, platform, license?            |
+| `capture`    | When was it taken, at what nominal resolution?                   |
 | `quality`    | How good is it — machine score and human verdict?                |
 | `alignment`  | Where does it truly sit — and does a human still need to fix it? |
 | `processing` | What did we build from it (tiles, zoom range, storage)?          |

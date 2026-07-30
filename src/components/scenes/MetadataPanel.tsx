@@ -78,6 +78,17 @@ export function MetadataPanel() {
           <Field label="License" value={scene.license.label} />
         </dl>
 
+        {scene.license.url && (
+          <a
+            href={scene.license.url}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-1.5 inline-block text-xs text-accent-400 underline decoration-accent-400/40 hover:decoration-accent-400"
+          >
+            License terms
+          </a>
+        )}
+
         {typeof orderingNote === 'string' && (
           <p className="mt-4 rounded-lg border border-surface-600 bg-surface-800/60 px-3 py-2 text-xs leading-relaxed text-gray-300">
             {orderingNote}

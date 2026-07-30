@@ -202,6 +202,7 @@ src/                    the website (React + TypeScript + MapLibre)
 public/
   align.html            the standalone alignment tool (plain HTML+JS)
   catalog/              harvested scene catalogs (declass, Maxar) — JSON
+  catalog/registry.json scene lifecycle registry (see docs/DATA_PIPELINE.md)
   tiles/index.json      tiles manifest        (see §4)
   tiles/corners.json    calibration registry  (see §4)
 scripts/                Node/Python used by the pipelines (documented headers)
@@ -213,6 +214,7 @@ scripts/                Node/Python used by the pipelines (documented headers)
   find-digitized.yml    scout which frames near a city are downloadable
   secret-scan.yml       gitleaks credential guard
 docs/HANDBOOK.md        this file
+docs/DATA_PIPELINE.md   the scene production line and lifecycle registry
 ```
 
 Rule enforced throughout: **no hardcoded endpoints** (all in
@@ -326,7 +328,7 @@ APIs only).
 
 | Provider (id) | Years | Georeferencing | Source of truth |
 |---|---|---|---|
-| USGS declass (`usgs-declass`) | 1960–1984 | none on film → our pipeline + registry | `public/catalog/declass-syria.json` (closed archive, harvested once) + M2M live when creds set |
+| USGS declass (`usgs-declass`) | 1960–1984 | none on film → our pipeline + registry | `public/catalog/declass-syria.json` (closed archive, harvested once); M2M credentials are workflow-only, never in the browser |
 | Landsat (`landsat`) | 1972– | native | LandsatLook STAC, queried live |
 | Sentinel-2 (`sentinel2`) | 2015– | native | Earth Search STAC, queried live |
 | Esri Wayback (`esri-wayback`) | 2014– | native | waybackconfig.json, queried live (grows by itself) |
