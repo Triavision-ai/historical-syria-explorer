@@ -18,8 +18,7 @@ export function Timeline() {
     // can render on the map (sharp tiles or a browse preview), not
     // metadata-only archive records.
     const displayable = scenes.filter(
-      (scene) =>
-        scene.captureDate && (scene.metadata['displayable'] === true || scene.previewUrl),
+      (scene) => scene.captureDate && (scene.metadata['displayable'] === true || scene.previewUrl),
     );
     const available = new Set<number>();
     for (const year of TIMELINE_YEARS) {

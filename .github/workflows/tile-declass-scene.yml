@@ -34,7 +34,7 @@ on:
         required: false
         default: ''
       clean_r2:
-        description: 'Delete the scene''s existing R2 tiles first (use after an alignment change)'
+        description: "Delete the scene's existing R2 tiles first (use after an alignment change)"
         required: false
         default: 'false'
 

@@ -40,9 +40,12 @@ async function m2m(endpoint, body, token) {
       try {
         payload = JSON.parse(text);
       } catch {
-        throw new Error(`${endpoint}: non-JSON response (${response.status}) ${text.slice(0, 200)}`);
+        throw new Error(
+          `${endpoint}: non-JSON response (${response.status}) ${text.slice(0, 200)}`,
+        );
       }
-      if (payload.errorCode) throw new Error(`${endpoint}: ${payload.errorCode} ${payload.errorMessage}`);
+      if (payload.errorCode)
+        throw new Error(`${endpoint}: ${payload.errorCode} ${payload.errorMessage}`);
       return payload.data;
     } catch (error) {
       if (attempt >= 4) throw error;
@@ -99,7 +102,9 @@ for (const place of places) {
     for (const opt of options ?? []) {
       if (opt.available) digitized.set(opt.entityId, opt);
     }
-    console.log(`  ${dataset}: ${results.length} frames cover the point, ${digitized.size} digitized`);
+    console.log(
+      `  ${dataset}: ${results.length} frames cover the point, ${digitized.size} digitized`,
+    );
     for (const [entityId] of digitized) {
       const scene = byId.get(entityId);
       const date = scene?.temporalCoverage?.startDate ?? '?';
