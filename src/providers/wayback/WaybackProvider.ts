@@ -88,10 +88,14 @@ export class WaybackProvider implements ImageryProvider {
       });
     }
     scenes.sort((a, b) => a.captureDate.localeCompare(b.captureDate));
-    // Keep one release per quarter to avoid flooding the scene list.
+    // Keep one release per quarter to avoid flooding the scene list. Months
+    // are 1-12, so the quarter is floor((month - 1) / 3): dividing the raw
+    // month by 4 instead yields uneven buckets (Jan-Mar, Apr-Jul, Aug-Nov,
+    // Dec), which drops an extra spring release and isolates December.
     const perQuarter = new Map<string, ImageScene>();
     for (const scene of scenes) {
-      const quarter = `${scene.captureDate.slice(0, 4)}-Q${Math.floor(Number(scene.captureDate.slice(5, 7)) / 4)}`;
+      const month = Number(scene.captureDate.slice(5, 7));
+      const quarter = `${scene.captureDate.slice(0, 4)}-Q${Math.floor((month - 1) / 3) + 1}`;
       perQuarter.set(quarter, scene);
     }
     return [...perQuarter.values()];
