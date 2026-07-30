@@ -78,9 +78,13 @@ export function corsSafeImageUrl(url: string): string {
   return `${ENDPOINTS.corsImageProxy}${encodeURIComponent(url)}`;
 }
 
-/** Credentials are only ever read from env — never hardcoded, never committed. */
+/**
+ * Public identifiers only. Secrets must never appear here: every VITE_
+ * variable is baked into the public browser bundle. USGS M2M credentials
+ * are therefore workflow-only (GitHub Actions secrets) — the browser
+ * provider always runs against the pre-harvested static catalog. The
+ * Earth Engine OAuth client id is public by design.
+ */
 export const CREDENTIALS = {
-  usgsM2MToken: env.VITE_USGS_M2M_TOKEN ?? '',
-  usgsM2MUsername: env.VITE_USGS_M2M_USERNAME ?? '',
   earthEngineClientId: env.VITE_EE_CLIENT_ID ?? '',
 } as const;

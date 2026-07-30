@@ -6,8 +6,10 @@ import { formatMonthYear } from '@/utils/date';
 /**
  * Bottom timeline. No fixed year ruler: as the user pans — Google Maps
  * style, no search needed — it rebuilds from the imagery actually found at
- * the current view, one marker per capture event, labeled with the image's
- * real date. Tapping a marker loads that event's best scene.
+ * the current view. Each marker is one mission-year group labeled with its
+ * best scene's real capture date; a ×N badge signals that the group holds
+ * further acquisitions (all reachable in the Scenes panel). Tapping a
+ * marker loads the group's best scene.
  */
 export function Timeline() {
   const scenes = useExplorerStore((state) => state.scenes);
@@ -70,6 +72,7 @@ export function Timeline() {
                   >
                     {shortMission(event.scene.mission)}
                     {event.hd ? ' · HD' : ''}
+                    {event.count > 1 ? ` · ×${event.count}` : ''}
                   </span>
                 </button>
               </li>

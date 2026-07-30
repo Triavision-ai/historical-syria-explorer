@@ -358,15 +358,25 @@
       };
 
       // ---- admin: apply the current adjustment via the processing pipeline ----
+      // The token is password-equivalent: keep it in sessionStorage only
+      // (gone when the tab closes), never in localStorage where any future
+      // script defect could read it back forever. Also purge any token a
+      // previous version of this page persisted.
       const REPO = 'Triavision-ai/historical-syria-explorer';
+      localStorage.removeItem('ghToken');
+      const ghToken = {
+        get: () => sessionStorage.getItem('ghToken') || '',
+        set: (t) => sessionStorage.setItem('ghToken', t),
+        clear: () => sessionStorage.removeItem('ghToken'),
+      };
       $('apply').onclick = async () => {
         if (!state.sceneId) return;
         if (!confirm('Re-cut this scene with the current adjustment?\nProcessing takes 1–2 hours; the site updates automatically when done.')) return;
-        let token = localStorage.getItem('ghToken') || '';
+        let token = ghToken.get();
         if (!token) {
-          token = (prompt('GitHub access token with Actions write permission on the repository (asked once; stays in this browser only):') || '').trim();
+          token = (prompt('GitHub access token with Actions write permission on the repository (kept only until this tab closes):') || '').trim();
           if (!token) return;
-          localStorage.setItem('ghToken', token);
+          ghToken.set(token);
         }
         $('status').textContent = 'Submitting to the pipeline…';
         try {
@@ -395,7 +405,7 @@
             {
               method: 'POST',
               headers: {
-                Authorization: 'Bearer ' + localStorage.getItem('ghToken'),
+                Authorization: 'Bearer ' + ghToken.get(),
                 Accept: 'application/vnd.github+json',
                 'Content-Type': 'application/json',
               },
@@ -415,7 +425,7 @@
           if (res.status === 204) {
             $('status').textContent = '✓ Accepted — re-cutting now. The site updates itself in 1–2 hours.';
           } else {
-            if (res.status === 401 || res.status === 403) localStorage.removeItem('ghToken');
+            if (res.status === 401 || res.status === 403) ghToken.clear();
             $('status').textContent = `Pipeline rejected the request (${res.status}) — check the token and try again.`;
           }
         } catch (error) {

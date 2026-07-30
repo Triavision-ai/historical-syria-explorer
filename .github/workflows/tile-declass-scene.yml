@@ -51,6 +51,47 @@ jobs:
         with:
           ref: main
 
+      # Dispatch inputs are untrusted text. They must never be interpolated
+      # into a run script (GitHub substitutes ${{ }} textually, so shell
+      # metacharacters become code). This step holds no secrets and rejects
+      # anything outside the expected shapes before any privileged step runs.
+      - name: Validate inputs (no secrets in this step)
+        env:
+          ENTITY_ID: ${{ inputs.entity_id }}
+          DATASET: ${{ inputs.dataset }}
+          MAX_ZOOM: ${{ inputs.max_zoom }}
+          CORNER_ORDER: ${{ inputs.corner_order }}
+          CORNERS_JSON: ${{ inputs.corners_json }}
+          CLEAN_R2: ${{ inputs.clean_r2 }}
+        run: |
+          set -eu
+          [[ "$ENTITY_ID" =~ ^[A-Za-z0-9_-]+(,[A-Za-z0-9_-]+)*$ ]] \
+            || { echo "entity_id rejected: must be comma-separated ids [A-Za-z0-9_-]"; exit 1; }
+          [[ "$DATASET" =~ ^[a-z0-9]+$ ]] \
+            || { echo "dataset rejected: lowercase alphanumeric id expected"; exit 1; }
+          [[ "$MAX_ZOOM" =~ ^[0-9]{1,2}$ ]] \
+            || { echo "max_zoom rejected: integer 0-99 expected"; exit 1; }
+          [[ -z "$CORNER_ORDER" || "$CORNER_ORDER" =~ ^(nw|ne|se|sw)(,(nw|ne|se|sw)){3}$ ]] \
+            || { echo "corner_order rejected: four of nw,ne,se,sw expected"; exit 1; }
+          [[ "$CLEAN_R2" =~ ^(true|false)$ ]] \
+            || { echo "clean_r2 rejected: true or false expected"; exit 1; }
+          node -e '
+            const j = process.env.CORNERS_JSON;
+            if (!j) process.exit(0);
+            const o = JSON.parse(j);
+            const keys = Object.keys(o).sort().join(",");
+            if (keys !== "ne,nw,se,sw") throw new Error("corners_json: exactly nw/ne/se/sw keys required");
+            for (const k of ["nw", "ne", "se", "sw"]) {
+              const v = o[k];
+              if (!Array.isArray(v) || v.length !== 2 || !v.every(Number.isFinite))
+                throw new Error(`corners_json: ${k} must be [lon, lat] finite numbers`);
+              const [lon, lat] = v;
+              if (Math.abs(lon) > 180 || Math.abs(lat) > 90)
+                throw new Error(`corners_json: ${k} outside geographic bounds`);
+            }
+          '
+          echo "all inputs validated"
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -63,8 +104,10 @@ jobs:
         env:
           USGS_M2M_USERNAME: ${{ secrets.USGS_M2M_USERNAME }}
           USGS_M2M_TOKEN: ${{ secrets.USGS_M2M_TOKEN }}
+          ENTITY_ID: ${{ inputs.entity_id }}
+          DATASET: ${{ inputs.dataset }}
         run: |
-          OUT=$(node scripts/download-declass.mjs "${{ inputs.entity_id }}" "${{ inputs.dataset }}" /tmp/dl)
+          OUT=$(node scripts/download-declass.mjs "$ENTITY_ID" "$DATASET" /tmp/dl)
           echo "$OUT"
           echo "file=$(echo "$OUT" | tail -1)" >> "$GITHUB_OUTPUT"
           echo "entity=$(echo "$OUT" | grep '^CHOSEN:' | tail -1 | cut -d: -f2)" >> "$GITHUB_OUTPUT"
@@ -72,8 +115,9 @@ jobs:
 
       - name: Extract archive if needed
         id: extract
+        env:
+          FILE: ${{ steps.download.outputs.file }}
         run: |
-          FILE="${{ steps.download.outputs.file }}"
           mkdir -p /tmp/extracted
           case "$FILE" in
             *.zip) unzip -o "$FILE" -d /tmp/extracted ;;
@@ -93,9 +137,12 @@ jobs:
           USGS_M2M_TOKEN: ${{ secrets.USGS_M2M_TOKEN }}
           CORNER_ORDER: ${{ inputs.corner_order }}
           CORNERS_JSON: ${{ inputs.corners_json }}
+          ENTITY: ${{ steps.download.outputs.entity }}
+          DATASET: ${{ inputs.dataset }}
+          MAX_ZOOM: ${{ inputs.max_zoom }}
         run: |
           set -e
-          PREP=$(node scripts/prepare-frame.mjs "${{ steps.download.outputs.entity }}" "${{ inputs.dataset }}" /tmp/extracted)
+          PREP=$(node scripts/prepare-frame.mjs "$ENTITY" "$DATASET" /tmp/extracted)
           echo "$PREP"
           VRT=$(echo "$PREP" | grep '^VRT:' | cut -d: -f2-)
           GCPS=$(echo "$PREP" | grep '^GCPS:' | cut -d: -f2-)
@@ -116,7 +163,7 @@ jobs:
           print(max(dist(at(0,0), at(w,0)) / w, dist(at(0,0), at(0,h)) / h))
           ")
           # ceil: the first zoom level at least as fine as the film itself.
-          ZMAX=$(python3 -c "import math; print(min(${{ inputs.max_zoom }}, math.ceil(math.log2(156543.03 / $NATIVE))))")
+          ZMAX=$(python3 -c "import math, os; print(min(int(os.environ['MAX_ZOOM']), math.ceil(math.log2(156543.03 / $NATIVE))))")
           TR=$(python3 -c "print(156543.03 / 2 ** $ZMAX)")
           echo "native ground resolution: ${NATIVE} m/px -> tiling to z${ZMAX} (${TR} m/px)"
           # DEFLATE is lossless — the JPEG intermediate used previously cost
@@ -127,8 +174,8 @@ jobs:
           gdal2tiles.py --xyz -z "8-${ZMAX}" -w none --processes=4 /tmp/warped.tif /tmp/tiles
           BOUNDS=$(python3 -c "import json,subprocess;d=json.loads(subprocess.run(['gdalinfo','-json','/tmp/warped.tif'],capture_output=True,text=True).stdout);c=d['wgs84Extent']['coordinates'][0];xs=[p[0] for p in c];ys=[p[1] for p in c];print(min(xs),min(ys),max(xs),max(ys))")
           echo "warped bounds: $BOUNDS"
-          node scripts/update-tiles-manifest.mjs "${{ steps.download.outputs.entity }}" 8 "$ZMAX" r2 $BOUNDS
-          node scripts/update-corners-registry.mjs "${{ steps.download.outputs.entity }}" "$CORNERS" "$ORDER"
+          node scripts/update-tiles-manifest.mjs "$ENTITY" 8 "$ZMAX" r2 $BOUNDS
+          node scripts/update-corners-registry.mjs "$ENTITY" "$CORNERS" "$ORDER"
           # Persist values for the commit step's regenerate-on-conflict retries.
           {
             echo "zmax=$ZMAX"
@@ -144,6 +191,8 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: auto
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          ENTITY: ${{ steps.download.outputs.entity }}
+          CLEAN_R2: ${{ inputs.clean_r2 }}
         run: |
           ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
           # Browsers need CORS to use tiles as WebGL textures; idempotent.
@@ -154,17 +203,23 @@ jobs:
           # re-sending everything (fresh tiles always differ in mtime).
           aws configure set default.s3.max_concurrent_requests 64
           aws configure set default.s3.max_queue_size 10000
-          if [ "${{ inputs.clean_r2 }}" = "true" ]; then
+          if [ "$CLEAN_R2" = "true" ]; then
             echo "Alignment changed — removing the scene's previous tiles first"
-            aws s3 rm "s3://syria-tiles/tiles/${{ steps.download.outputs.entity }}" \
+            aws s3 rm "s3://syria-tiles/tiles/$ENTITY" \
               --recursive --endpoint-url "$ENDPOINT" --only-show-errors || true
           fi
-          aws s3 sync /tmp/tiles "s3://syria-tiles/tiles/${{ steps.download.outputs.entity }}" \
+          aws s3 sync /tmp/tiles "s3://syria-tiles/tiles/$ENTITY" \
             --endpoint-url "$ENDPOINT" --no-progress --only-show-errors --size-only \
             --cache-control "public, max-age=31536000, immutable"
           echo "Uploaded $(find /tmp/tiles -name '*.png' | wc -l) tiles"
 
       - name: Commit manifest
+        env:
+          ENTITY: ${{ steps.download.outputs.entity }}
+          ZMAX: ${{ steps.georef.outputs.zmax }}
+          BOUNDS: ${{ steps.georef.outputs.bounds }}
+          CORNERS: ${{ steps.georef.outputs.corners }}
+          ORDER: ${{ steps.georef.outputs.order }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -174,12 +229,12 @@ jobs:
           for attempt in 1 2 3 4 5 6; do
             git fetch -q origin main
             git reset -q --hard origin/main
-            node scripts/update-tiles-manifest.mjs "${{ steps.download.outputs.entity }}" 8 "${{ steps.georef.outputs.zmax }}" r2 ${{ steps.georef.outputs.bounds }}
-            node scripts/update-corners-registry.mjs "${{ steps.download.outputs.entity }}" '${{ steps.georef.outputs.corners }}' "${{ steps.georef.outputs.order }}"
+            node scripts/update-tiles-manifest.mjs "$ENTITY" 8 "$ZMAX" r2 $BOUNDS
+            node scripts/update-corners-registry.mjs "$ENTITY" "$CORNERS" "$ORDER"
             # Old in-repo pyramid for this scene is superseded by R2.
-            git rm -r -q --ignore-unmatch "public/tiles/${{ steps.download.outputs.entity }}"
+            git rm -r -q --ignore-unmatch "public/tiles/$ENTITY"
             git add public/tiles/index.json public/tiles/corners.json
-            git commit -q -m "data: R2 full-resolution tiles for ${{ steps.download.outputs.entity }}" \
+            git commit -q -m "data: R2 full-resolution tiles for $ENTITY" \
               || { echo "registry already up to date"; exit 0; }
             if git push; then exit 0; fi
             echo "push lost the race, regenerating on latest main (attempt $attempt)"
