@@ -203,7 +203,10 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
       (scene) => scene.metadata['displayable'] === true || scene.previewUrl,
     );
     if (displayable.length === 0) return;
-    const sharp = displayable.filter((scene) => scene.metadata['displayable'] === true);
+    // `tiled` (our own full-resolution pyramid), NOT `displayable`: Wayback
+    // and Maxar mark every scene displayable, so filtering on that put a 2014
+    // basemap snapshot on the "then" side and made the fallback unreachable.
+    const sharp = displayable.filter((scene) => scene.metadata['tiled'] === true);
     const left = (sharp.length > 0 ? sharp : displayable)[0] ?? null;
     await setCompareRight(null);
     set({ compareMode: true, activePanel: null });
