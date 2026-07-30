@@ -1,3 +1,13 @@
 dist
 coverage
 pnpm-lock.yaml
+
+# CI-owned registries: the tiling pipeline writes these with its own
+# JSON.stringify formatting on every run. Letting prettier reformat them
+# guarantees a conflict with the next pipeline commit.
+public/tiles/
+
+# Hand-formatted standalone documents. Prettier's opinion adds nothing here
+# and its reflowing churn buries real edits.
+public/align.html
+docs/HANDBOOK.md
