@@ -29,11 +29,19 @@ export function ExplorerMap() {
   const compareRightLayer = useExplorerStore((state) => state.compareRightLayer);
   const comparing = compareMode && sceneLayer !== null;
 
-  // Fly to a newly chosen location.
+  // Fly to a newly chosen location. Only a fly REQUEST may move the camera:
+  // pan-follow writes the settled centre back into the store, and depending on
+  // `center`/`zoom` here would re-fly on every pan — snapping the user's zoom
+  // back to the stale store value they last searched at.
   useEffect(() => {
     if (!mainMap || flyRequestId === 0) return;
-    mainMap.flyTo({ center: [center.lon, center.lat], zoom, essential: true });
-  }, [mainMap, flyRequestId, center, zoom]);
+    const target = useExplorerStore.getState();
+    mainMap.flyTo({
+      center: [target.center.lon, target.center.lat],
+      zoom: target.zoom,
+      essential: true,
+    });
+  }, [mainMap, flyRequestId]);
 
   // Apply / clear the historical overlay.
   useEffect(() => {
