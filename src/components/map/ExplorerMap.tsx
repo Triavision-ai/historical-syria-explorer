@@ -122,7 +122,15 @@ export function ExplorerMap() {
       {/* Right / current-day map (only in compare mode, underneath). */}
       {comparing && (
         <div className="absolute inset-0">
-          <MapCanvas center={center} zoom={zoom} onMapReady={setCompareMap} />
+          {/* onMapDestroy is load-bearing: without it a destroyed MapLibre
+              instance stays in state and a later overlay update on it
+              throws inside an effect, unmounting the whole app. */}
+          <MapCanvas
+            center={center}
+            zoom={zoom}
+            onMapReady={setCompareMap}
+            onMapDestroy={() => setCompareMap(null)}
+          />
         </div>
       )}
 

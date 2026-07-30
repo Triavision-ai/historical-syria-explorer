@@ -2,7 +2,15 @@ import { create } from 'zustand';
 import type { BoundingBox, GeoPoint, ImageScene, SceneLayer } from '@/types';
 import type { ProviderSearchOutcome } from '@/services';
 import { providerRegistry, sceneSearchService } from '@/services';
-import { bboxAroundPoint, bboxCovers, bboxSpan, clampBboxSpan, expandBbox } from '@/utils/bbox';
+import {
+  bboxAroundPoint,
+  bboxCenter,
+  bboxContains,
+  bboxCovers,
+  bboxSpan,
+  clampBboxSpan,
+  expandBbox,
+} from '@/utils/bbox';
 import {
   DEFAULT_LOCATION,
   DEFAULT_MAX_CLOUD_COVER,
@@ -42,7 +50,7 @@ interface ExplorerState {
   searchScenesAt: (center: GeoPoint, bbox?: BoundingBox) => Promise<void>;
   /** Map settled somewhere — refresh the scene list if the view changed enough. */
   mapMoved: (center: GeoPoint, viewport: BoundingBox) => void;
-  selectScene: (scene: ImageScene | null) => Promise<void>;
+  selectScene: (scene: ImageScene | null, opts?: { openPanel?: boolean }) => Promise<void>;
   setOverlayOpacity: (opacity: number) => void;
   setCompareMode: (enabled: boolean) => void;
   setActivePanel: (panel: SidePanel) => void;
@@ -54,7 +62,16 @@ interface ExplorerState {
 let searchAbort: AbortController | null = null;
 /** Area covered by the last executed search — pan-follow skips views it already answers. */
 let searchedBbox: BoundingBox | null = null;
+/** True when the last search used the point-buffer fallback (goTo / first load). */
+let searchedFromPointBuffer = false;
 let panSearchTimer: ReturnType<typeof setTimeout> | null = null;
+
+function cancelPendingPanSearch(): void {
+  if (panSearchTimer) {
+    clearTimeout(panSearchTimer);
+    panSearchTimer = null;
+  }
+}
 
 /**
  * Does the last search still answer this viewport? Yes while the viewport
@@ -88,6 +105,10 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
   compareRightLayer: null,
 
   goTo: (name, center, zoom) => {
+    // An explicit navigation supersedes any pan search still waiting to
+    // fire — a stale timer would abort this search and overwrite the
+    // location name with 'Map view'.
+    cancelPendingPanSearch();
     set((state) => ({
       locationName: name,
       center,
@@ -98,10 +119,25 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
   },
 
   mapMoved: (center, viewport) => {
+    // A point-buffer search (goTo / first load) has an arbitrary square
+    // extent that never matches a real viewport. When the map then merely
+    // settles on that same spot, adopt the settled viewport as the covered
+    // area instead of re-running the identical search (and instead of
+    // renaming a freshly searched place to 'Map view').
+    if (
+      searchedFromPointBuffer &&
+      searchedBbox &&
+      bboxContains(viewport, bboxCenter(searchedBbox)) &&
+      bboxSpan(viewport) < 0.5
+    ) {
+      searchedBbox = viewport;
+      searchedFromPointBuffer = false;
+      return;
+    }
     if (searchedBbox && searchCovers(searchedBbox, viewport)) return;
     // Small settle delay: panning across the country in several flicks
     // should trigger one search at the destination, not one per flick.
-    if (panSearchTimer) clearTimeout(panSearchTimer);
+    cancelPendingPanSearch();
     panSearchTimer = setTimeout(() => {
       set({ center, locationName: 'Map view' });
       void get().searchScenesAt(center, clampBboxSpan(viewport, MAX_SEARCH_BBOX_SPAN));
@@ -114,6 +150,7 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
     searchAbort = abort;
     const searchBbox = bbox ?? bboxAroundPoint(center, SEARCH_BBOX_DELTA);
     searchedBbox = searchBbox;
+    searchedFromPointBuffer = !bbox;
     set({ searchStatus: 'loading' });
     try {
       const result = await sceneSearchService.search(
@@ -132,7 +169,7 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
     }
   },
 
-  selectScene: async (scene) => {
+  selectScene: async (scene, opts) => {
     if (!scene) {
       set({ selectedScene: null, sceneLayer: null, sceneLayerLoading: false });
       return;
@@ -141,7 +178,7 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
       selectedScene: scene,
       sceneLayer: null,
       sceneLayerLoading: true,
-      activePanel: 'metadata',
+      ...(opts?.openPanel === false ? {} : { activePanel: 'metadata' as SidePanel }),
     });
     try {
       const layer = await providerRegistry.get(scene.provider).load(scene);
@@ -177,7 +214,9 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
     const left = (sharp.length > 0 ? sharp : displayable)[0] ?? null;
     await setCompareRight(null);
     set({ compareMode: true, activePanel: null });
-    await selectScene(left);
+    // openPanel: false — the whole point of quick compare is an
+    // unobstructed swipe view; the metadata drawer would cover it.
+    await selectScene(left, { openPanel: false });
   },
 
   setCompareRight: async (scene) => {
