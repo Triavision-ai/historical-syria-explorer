@@ -152,6 +152,22 @@ export function ExplorerMap() {
         </div>
       </div>
 
+      {/* Overlay attribution: MapLibre only shows source attribution for
+          raster-tile sources, so georeferenced-image overlays (USGS/STAC
+          browse previews) would otherwise display without their required
+          provider notice. Render it ourselves for whatever is visible. */}
+      {(sceneLayer?.attribution || (comparing && compareRightLayer?.attribution)) && (
+        <span className="pointer-events-none absolute bottom-32 left-3 z-10 max-w-[70vw] truncate rounded-md bg-surface-950/70 px-2 py-1 text-[10px] text-gray-400 sm:bottom-24">
+          {[
+            ...new Set(
+              [sceneLayer?.attribution, comparing ? compareRightLayer?.attribution : null].filter(
+                Boolean,
+              ),
+            ),
+          ].join(' · ')}
+        </span>
+      )}
+
       {comparing && (
         <>
           {/* Swipe divider */}
