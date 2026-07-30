@@ -14,18 +14,32 @@ interface NominatimResult {
 
 const COORDINATE_PATTERN = /^\s*(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)\s*$/;
 const RESULT_LIMIT = 6;
+/** Public Nominatim allows at most 1 request/second. */
+const MIN_REQUEST_INTERVAL_MS = 1100;
 
 /**
  * Resolves free-text place names (Arabic or English) and raw coordinates to
  * locations, biased to Syria via a viewbox. Backed by OSM Nominatim under
- * its usage policy — endpoint configurable, no scraping.
+ * its usage policy: explicit-submit queries only (no autocomplete), at
+ * most one request per second, responses cached for the session.
  */
 export class GeocodingService {
+  private readonly cache = new Map<string, Place[]>();
+  private lastRequestAt = 0;
+
   constructor(private readonly baseUrl: string = ENDPOINTS.nominatim) {}
 
   async search(text: string, signal?: AbortSignal): Promise<Place[]> {
     const coordinate = this.parseCoordinates(text);
     if (coordinate) return [coordinate];
+
+    const cacheKey = text.trim().toLowerCase();
+    const cached = this.cache.get(cacheKey);
+    if (cached) return cached;
+
+    const waitMs = this.lastRequestAt + MIN_REQUEST_INTERVAL_MS - Date.now();
+    if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs));
+    this.lastRequestAt = Date.now();
 
     const params = new URLSearchParams({
       q: text,
@@ -41,7 +55,7 @@ export class GeocodingService {
       signal ? { signal } : undefined,
     );
 
-    return results.map((result) => ({
+    const places = results.map((result) => ({
       name: result.name ?? result.display_name.split(',')[0] ?? text,
       displayName: result.display_name,
       location: { lat: Number(result.lat), lon: Number(result.lon) },
@@ -57,6 +71,8 @@ export class GeocodingService {
         : {}),
       ...(result.address?.country_code ? { countryCode: result.address.country_code } : {}),
     }));
+    this.cache.set(cacheKey, places);
+    return places;
   }
 
   /** Accepts "lat, lon" input like "35.13, 36.76". */
