@@ -38,10 +38,41 @@ the agreed backlog.
 - public/align.html = standalone by-eye alignment tool (move/rotate/
   scale/mirror/compare/sharpen). Its "Apply permanently (admin)" button
   dispatches tile-declass-scene.yml with a GitHub token the admin keeps
-  in their own browser (localStorage `ghToken`).
+  in their own browser (sessionStorage `ghToken`, tab-lifetime only; a
+  GitHub App or reviewed-proposal flow is the planned replacement).
 - Workflows: tile-declass-scene.yml (film → R2 tiles, the core),
   find-digitized.yml (which frames near a point are downloadable),
   harvest-declass / harvest-maxar (catalogs), deploy.yml, secret-scan.yml.
+
+## State as of 2026-08-01
+
+- Quality scoring DECIDED (ends the open question in DATA_PIPELINE §4):
+  Claude Haiku 4.5 grades every browse image via the Batch API
+  (~$9 for the whole 8,564-frame archive); Claude Sonnet 5 re-judges
+  only Haiku's borderline band; disagreements and residual borderlines
+  go to Ahmad. Every verdict records model id + prompt version in
+  registry.json so the archive is cheaply re-scorable. Next concrete
+  step: a ~50-frame pilot Ahmad verifies by eye before the full run.
+  Note: browse previews are downsampled — scoring judges usability
+  (cloud/blur/damage), never true resolution.
+- Comparison classes agreed (docs/DATA_PIPELINE.md §5): building-level
+  comparison requires GSD <= 1 m AND human-verified alignment (today:
+  Hama only). KH-9 (~6 m) is block/neighborhood class and can never be
+  building class — that is the justification for ordering KH-7 scans
+  for Damascus and Aleppo (backlog). UI should label the class, never
+  imply measurement-grade accuracy.
+- Damascus finding: it sits at the extreme south edge of frame
+  DZB1210-500184L001001 (bounds end at lat 33.49; the city is at
+  33.51), so with the current misalignment the film's black border
+  covers the city and the "HD" badge misleads. Alignment will help but
+  coverage may stay partial — a Damascus-centered frame from the
+  catalog (110 scenes there) is the real fix.
+- Comparison research (Corona Atlas, Google Earth, Esri Wayback, EO
+  Browser, Worldview, OldMapsOnline) validated the per-place real-date
+  timeline and produced adopted lessons: stable gray-don't-remove
+  timeline, big prev/next controls, per-scene truth popup, public
+  swipe compare, one curated scene per city/era as default, never
+  silently backfill a different date.
 
 ## State as of 2026-07-30
 
@@ -98,13 +129,30 @@ the agreed backlog.
 
 ## Agreed backlog (user-approved direction)
 
-1. Watch-list cron: weekly find-digitized sweep over a
+1. assess-scenes.yml: the quality-scoring station (DATA_PIPELINE §4).
+   Haiku 4.5 grades all browse images via Batch API, Sonnet 5 referees
+   the borderline band, Ahmad settles disputes. Start with the ~50-frame
+   pilot for by-eye verification. Writes registry.json quality blocks.
+2. Registry-driven publication + honest badges: split "HD" into
+   "Full resolution" (pipeline fact) and "Approximate alignment"
+   (orange until human-verified); gate/label on registry status so an
+   unaligned scene never shows as authoritative (Damascus screenshot).
+3. Timeline/UX from comparison research: gray-don't-remove stable
+   timeline, big prev/next, per-scene truth popup (mission, true date,
+   native resolution, alignment class), public swipe compare, one
+   curated scene per city/era as default.
+4. order-scan workflow: try M2M ordering endpoints for scan-on-demand;
+   fall back to documented manual EarthExplorer ordering. Order sharper
+   KH-7 frames for Damascus and Aleppo (only path to building-level
+   comparison there — KH-9 can't reach it). Also find a
+   Damascus-centered frame in the catalog.
+5. Watch-list cron: weekly find-digitized sweep over a
    public/catalog/watchlist.json; auto-dispatch tiling for newly
    digitized frames.
-2. order-scan workflow: try M2M ordering endpoints for scan-on-demand;
-   fall back to documented manual EarthExplorer ordering. Order sharper
-   KH-7 frames for Damascus and Aleppo when possible.
-3. Optional COG per scene in R2 (single downloadable georeferenced file).
-4. Arabic UI.
-5. More cities/eras from the 8,564-scene catalog (Tartus, Daraa,
+6. Optional COG per scene in R2 (single downloadable georeferenced file).
+7. PWA: manifest + service worker (Add to Home Screen, offline tile
+   cache of recently viewed cities) — no app store, keeps the free/URL
+   model; ties in with Arabic UI.
+8. Arabic UI (RTL, place-name variants).
+9. More cities/eras from the 8,564-scene catalog (Tartus, Daraa,
    Qamishli, Palmyra, pre-lake Euphrates valley).

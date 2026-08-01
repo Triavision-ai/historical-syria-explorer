@@ -14,26 +14,26 @@ This is an educational, non-commercial project under active development. It is a
 
 ## What it does today
 
-- Search any city, town, or village in Syria, in Arabic or English, or by coordinates.
-- Browse a timeline from 1960 to the present; selecting a year loads the closest suitable image for the current location.
+- Explore like a map: pan and zoom anywhere in Syria, or search for a city, town, or village in Arabic or English, or by coordinates.
+- A per-place timeline shows the real capture dates of the imagery that actually covers the current view; selecting a date loads that image. Empty stretches are shown as gaps rather than filled with a different date.
 - Compare any two dates with a swipe divider, or blend a historical image over the modern map with an opacity control.
 - Every scene shows its full metadata: mission, capture date, resolution, footprint, license, and a link to the original archive record.
 
 ### Imagery sources
 
-| Source                                                          | Period                     | Resolution | Access                                                                                    |
-| --------------------------------------------------------------- | -------------------------- | ---------- | ----------------------------------------------------------------------------------------- |
-| USGS declassified reconnaissance film (CORONA, GAMBIT, HEXAGON) | 1960-1984                  | 0.6-9 m    | 8,564 scenes over Syria indexed; selected frames processed to full resolution (see below) |
-| Landsat (USGS/NASA)                                             | 1972-present               | 30-60 m    | Full archive, searched live                                                               |
-| Sentinel-2 (ESA Copernicus)                                     | 2015-present               | 10 m       | Full archive, searched live                                                               |
-| Esri World Imagery Wayback                                      | 2014-present               | ~0.5 m     | Dated basemap snapshots for all of Syria                                                  |
-| Maxar Open Data Program                                         | around the 2023 earthquake | ~0.4 m     | 1,422 scenes over northwest Syria                                                         |
+| Source                                                          | Period                     | Resolution | Access                                                                                                                                              |
+| --------------------------------------------------------------- | -------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| USGS declassified reconnaissance film (CORONA, GAMBIT, HEXAGON) | 1960-1984                  | 0.6-9 m    | 8,564 scenes over Syria indexed; selected frames processed to full resolution (see below)                                                           |
+| Landsat (USGS/NASA)                                             | 1972-present               | 30-60 m    | Full archive, searched live                                                                                                                         |
+| Sentinel-2 (ESA Copernicus)                                     | 2015-present               | 10 m       | Full archive, searched live                                                                                                                         |
+| Esri World Imagery Wayback                                      | 2014-present               | varies     | Map-publication snapshots for all of Syria; the label is the release date, not necessarily the local capture date, and local detail varies by place |
+| Maxar Open Data Program                                         | around the 2023 earthquake | ~0.4 m     | 1,422 scenes over northwest Syria                                                                                                                   |
 
-All sources are official and publicly licensed. The application uses no proprietary services, no scraped content, and no map labels; the interface shows imagery only.
+All sources are official and publicly licensed under their respective terms. The application does not scrape imagery, use Google historical imagery, or show map labels — the interface shows imagery only. It does rely on some external public services (the OpenStreetMap Nominatim geocoder, a tile-rendering proxy for some modern layers); these are used within their published terms.
 
 ### Full-resolution historical film
 
-For selected cities, the original declassified film scans (2-3 GB per frame) are downloaded from the USGS archive, georeferenced, and rendered as sharp map tiles served directly by this repository. These scenes are marked "HD" in the scene list and are preferred automatically when a timeline year is selected. Processed so far, or in processing: Hama (1966), Homs and Damascus (1975), Deir ez-Zor (1964), Aleppo (1966), Latakia (1966), Raqqa (1973), Idlib (1973).
+For selected cities, the original declassified film scans (2-3 GB per frame) are downloaded from the USGS archive, georeferenced, and rendered as map tiles. The tiles are stored in Cloudflare R2 (the repository holds the application, catalogs, manifests, and calibration records). Tiles use lossless PNG encoding, but georeferencing reprojects and resamples the scan, so the tiled output is not pixel-identical to the original film. Processed so far: Hama (1966, hand-aligned reference), and Aleppo, Latakia, Idlib, Deir ez-Zor, Homs+Damascus, and Raqqa (1973-75, first-pass alignment pending by-eye correction). Publication and alignment status are tracked per scene in `public/catalog/registry.json`; only Hama currently supports building-level comparison (see `docs/DATA_PIPELINE.md` §5).
 
 Any of the 8,564 indexed frames can be processed the same way by running a single workflow, subject to hosting space. Frames that USGS has not yet digitized require a one-time scan request through EarthExplorer.
 
