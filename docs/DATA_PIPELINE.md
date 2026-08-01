@@ -1,7 +1,7 @@
 # Data pipeline: the production line for imagery
 
-Status: design agreed in principle 2026-07-23; quality-scoring method
-pending a decision (see section 4). Companion to `docs/HANDBOOK.md`.
+Status: design agreed 2026-07-23; quality-scoring method decided
+2026-08-01 (see section 4). Companion to `docs/HANDBOOK.md`.
 
 ## 1. Purpose
 
@@ -69,39 +69,75 @@ The `needsHuman` flag makes the human queue explicit: the alignment
 backlog is simply every record with `alignment.needsHuman: true`, and
 the assessment queue is every record awaiting `humanVerdict`.
 
-## 4. Quality scoring — the open decision
+## 4. Quality scoring — decided (2026-08-01)
 
 The score must work on panchromatic film browse images (no spectral
 bands) and on modern RGB previews, and must be reproducible: every score
 is stored with `method` and `assessedAt` so the whole archive can be
-re-scored when the method improves. Candidate approaches:
+re-scored when the method improves.
 
-**A. Classical image statistics (no ML).** Python/OpenCV in a GitHub
-Action over each browse JPEG: cloud fraction from bright low-texture
-area, sharpness from Laplacian variance, plus contrast and coverage of
-the frame. Free at any scale (8,564 frames in one run), fully
-transparent and tunable, but approximate — snow, desert glare, and haze
-can fool it.
+**Important limit: browse images cannot measure resolution.** The USGS
+browse JPEGs are heavily downsampled, so scoring judges _usability_ —
+cloud fraction, haze, frame damage, and relative sharpness — never true
+ground resolution. Resolution stays a metadata fact (KH-7 ≈ 0.6 m,
+KH-9 mapping ≈ 6 m) plus whatever the full-resolution scan delivers at
+tiling time.
 
-**B. Small learned models.** A lightweight cloud/blur classifier over
-browse images. More accurate than A once trained, but needs labeled
-examples from our own archive first — a human labeling effort that does
-not exist yet.
+**Decision: a vision model grades everything, with a cheaper/dearer
+tier.** The candidate approaches were classical image statistics (free
+but fooled by desert glare/snow/haze), a trained classifier (needs
+labeled data we do not have), and a vision-language model. Vision won on
+accuracy-per-effort once real prices were checked:
 
-**C. Vision-language model scoring.** Send each browse image to a
-multimodal model (e.g. the Claude API) asking for cloud percentage,
-sharpness, and usefulness for a city explorer. Closest to a human
-judgment and needs no training data, but costs per image, needs an API
-key in Actions secrets, and scores are less strictly reproducible.
+1. **Claude Haiku 4.5 grades every browse image** via the Batch API.
+   Cloud/haze/damage/sharpness → a `usable | borderline | junk` verdict.
+   Cost for the full 8,564-frame archive is on the order of $9 (Batch
+   API halves list prices; nothing here is latency-sensitive).
+2. **Claude Sonnet 5 re-judges only Haiku's borderline band** — a small
+   fraction, a dollar or two. Disagreements and residual borderlines go
+   to the human queue.
+3. **Ahmad is the calibration standard.** Before the full run, a
+   ~50-frame pilot is graded by Haiku, by Sonnet, and by Ahmad. If Haiku
+   agrees with his eye ~90% of the time, tier 1 stands; otherwise the
+   bulk pass moves to Sonnet (≈ $17 for the whole archive at intro
+   pricing — still less than one scan order).
 
-**Recommendation: A for everything, C for the doubtful band.** Run the
-classical pass over the full archive for free; auto-accept the clearly
-good, auto-reject the clearly bad, and send only the uncertain middle
-(expected to be a small fraction) to a vision model or to the human
-queue. Store which method produced each verdict. Revisit B only if the
-labeled data accumulated by the human queue makes training worthwhile.
+Every verdict records the exact model id and prompt version in its
+`quality.method` (e.g. `haiku-4-5-batch-v1`) plus `assessedAt`, so the
+archive is cheaply re-scorable when a better model ships. Never
+auto-reject on a single heuristic; a classical statistics pass may still
+be added later as a free cross-check, but is not required.
 
-## 5. What "solid data" means here
+## 5. Comparison classes — what a scene is good enough for
+
+"Comparing buildings" needs both **resolution fine enough to see a
+building** and **alignment better than a building's width**. A Syrian
+house is ~10–15 m across, so:
+
+| Class            | Requirement                                 | Sees                                        |
+| ---------------- | ------------------------------------------- | ------------------------------------------- |
+| **building**     | GSD ≤ 1 m AND `alignment.needsHuman: false` | individual houses, courtyards, condition    |
+| **block**        | GSD ≤ ~6 m                                  | city blocks, mosques, stadiums, street grid |
+| **neighborhood** | GSD ≤ ~10 m                                 | district shape, built-up extent             |
+| **city**         | GSD ≤ ~30 m                                 | urban growth over decades                   |
+
+Consequences the registry and UI must respect:
+
+- Today only **Hama (KH-7, 0.6 m, human-verified)** meets the building
+  class. The 1973–75 KH-9 cities are **block** class and can never be
+  building class no matter how well aligned — that is why sharper KH-7
+  frames for Damascus and Aleppo are on the backlog.
+- **Alignment gates the class.** A 0.6 m scene that is 2 km off is worse
+  than nothing for building comparison — you would compare the wrong
+  buildings. A scene is building class only when both resolution and
+  human-verified alignment hold.
+- **Honesty, not measurement.** Even a perfect pair supports _visual_
+  comparison ("this building existed then, it is gone now"), not
+  survey/measurement use: film warp can drift positions several metres
+  across a frame. The UI labels the class and shows a "not for
+  measurement" note; it never implies metric accuracy.
+
+## 6. What "solid data" means here
 
 - Every published pixel is traceable to a source, a license, a capture
   date, and the exact calibration used to place it.
