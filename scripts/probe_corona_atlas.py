@@ -39,6 +39,8 @@ def load_places():
 
 SAMPLE_HALF_DEG = 0.045  # ~5 km half-width sample window
 SAMPLE_PX = 1024
+MAX_CONFIRM = 3   # stop after this many layers proven to hold imagery at the point
+MAX_ATTEMPTS = 25  # give up on a place after this many blank/error layers
 
 
 def fetch_capabilities():
@@ -72,7 +74,13 @@ def parse_layers(caps_text):
         except (KeyError, ValueError):
             continue
         layers.append((name_m.group(1), bbox))
-    return layers
+    # The same layer is advertised once per format/style: dedupe by name.
+    seen, unique = set(), []
+    for name, bbox in layers:
+        if name not in seen:
+            seen.add(name)
+            unique.append((name, bbox))
+    return unique
 
 
 def covering(layers, lon, lat):
@@ -82,7 +90,7 @@ def covering(layers, lon, lat):
     return hits
 
 
-def get_map(layer, lon, lat, out_path):
+def get_map(layer, lon, lat):
     h = SAMPLE_HALF_DEG
     params = {
         "SERVICE": "WMS",
@@ -99,10 +107,28 @@ def get_map(layer, lon, lat, out_path):
     r = requests.get(f"{BASE}/wms", params=params, headers=UA, timeout=180)
     content_type = r.headers.get("content-type", "")
     if r.ok and content_type.startswith("image/"):
-        with open(out_path, "wb") as f:
-            f.write(r.content)
-        return True, f"{len(r.content)} bytes"
-    return False, f"HTTP {r.status_code} {content_type}: {r.text[:300]}"
+        return r.content, None
+    return None, f"HTTP {r.status_code} {content_type}: {r.text[:200]}"
+
+
+def is_blank(png_bytes):
+    """True when the sample holds no imagery (fully transparent or uniform).
+
+    The capabilities bboxes are coarse grid cells, so a layer can 'cover'
+    a point while its actual film strip lies elsewhere - the server then
+    returns an empty transparent PNG. Decide by pixels, not byte size.
+    """
+    from io import BytesIO
+
+    from PIL import Image
+
+    img = Image.open(BytesIO(png_bytes)).convert("RGBA")
+    alpha_lo, alpha_hi = img.getextrema()[3]
+    if alpha_hi == 0:
+        return True
+    gray = img.convert("L")
+    lo, hi = gray.getextrema()
+    return lo == hi
 
 
 def main():
@@ -118,16 +144,32 @@ def main():
         hits = covering(layers, lon, lat)
         report.append(f"## {city}  ({lon}, {lat})")
         if not hits:
-            report.append("No covering layers.")
+            report.append("No covering layers (by bbox).")
             report.append("")
             continue
-        for name, bbox in hits[:12]:
-            report.append(f"- `{name}`  bbox={tuple(round(v, 3) for v in bbox)}")
-        if len(hits) > 12:
-            report.append(f"- ... and {len(hits) - 12} more")
-        name = hits[0][0]
-        ok, detail = get_map(name, lon, lat, f"probe-output/{city}.png")
-        report.append(f"\nSample GetMap from `{name}`: {'saved' if ok else 'FAILED'} ({detail})")
+        report.append(f"Candidate layers by bbox: {len(hits)} (coarse grid cells - pixel check decides)")
+        confirmed, blanks, errors = [], 0, 0
+        for name, _bbox in hits:
+            if len(confirmed) >= MAX_CONFIRM or (blanks + errors) >= MAX_ATTEMPTS:
+                break
+            png, err = get_map(name, lon, lat)
+            if err:
+                errors += 1
+                continue
+            if is_blank(png):
+                blanks += 1
+                continue
+            confirmed.append(name)
+            if len(confirmed) == 1:
+                with open(f"probe-output/{city}.png", "wb") as f:
+                    f.write(png)
+        for name in confirmed:
+            report.append(f"- CONFIRMED imagery at this point: `{name}`")
+        report.append(
+            f"Checked {len(confirmed) + blanks + errors} layers: "
+            f"{len(confirmed)} with imagery, {blanks} blank, {errors} errors."
+            + (" Sample saved." if confirmed else " NO imagery found at this point in the first candidates.")
+        )
         report.append("")
     with open("probe-output/report.md", "w") as f:
         f.write("\n".join(report))
