@@ -39,8 +39,9 @@ def load_places():
 
 SAMPLE_HALF_DEG = 0.045  # ~5 km half-width sample window
 SAMPLE_PX = 1024
-MAX_CONFIRM = 3   # stop after this many layers proven to hold imagery at the point
-MAX_ATTEMPTS = 25  # give up on a place after this many blank/error layers
+PROBE_PX = 256     # tiny existence-check size: cheap enough for many attempts
+MAX_CONFIRM = 3    # stop after this many layers proven to hold imagery at the point
+MAX_ATTEMPTS = 80  # give up on a place after this many blank/error layers
 
 
 def fetch_capabilities():
@@ -90,7 +91,7 @@ def covering(layers, lon, lat):
     return hits
 
 
-def get_map(layer, lon, lat):
+def get_map(layer, lon, lat, px=SAMPLE_PX):
     h = SAMPLE_HALF_DEG
     params = {
         "SERVICE": "WMS",
@@ -99,8 +100,8 @@ def get_map(layer, lon, lat):
         "LAYERS": layer,
         "SRS": "EPSG:4326",
         "BBOX": f"{lon - h},{lat - h},{lon + h},{lat + h}",
-        "WIDTH": SAMPLE_PX,
-        "HEIGHT": SAMPLE_PX,
+        "WIDTH": px,
+        "HEIGHT": px,
         "FORMAT": "image/png",
         "TRANSPARENT": "true",
     }
@@ -152,7 +153,9 @@ def main():
         for name, _bbox in hits:
             if len(confirmed) >= MAX_CONFIRM or (blanks + errors) >= MAX_ATTEMPTS:
                 break
-            png, err = get_map(name, lon, lat)
+            # Cheap tiny existence check first; the shareable full-size
+            # sample is fetched only for the first confirmed layer.
+            png, err = get_map(name, lon, lat, px=PROBE_PX)
             if err:
                 errors += 1
                 continue
@@ -161,8 +164,9 @@ def main():
                 continue
             confirmed.append(name)
             if len(confirmed) == 1:
+                full, err = get_map(name, lon, lat)
                 with open(f"probe-output/{city}.png", "wb") as f:
-                    f.write(png)
+                    f.write(full if not err else png)
         for name in confirmed:
             report.append(f"- CONFIRMED imagery at this point: `{name}`")
         report.append(
