@@ -20,7 +20,7 @@ jobs:
           python-version: '3.12'
       - name: Probe the Atlas
         run: |
-          pip install --quiet requests
+          pip install --quiet requests pillow
           python scripts/probe_corona_atlas.py
       - name: Publish summary
         if: always()
