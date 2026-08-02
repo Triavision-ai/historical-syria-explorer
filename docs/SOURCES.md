@@ -22,6 +22,65 @@ maps. Ground-level photo collections are recorded but deferred.
 
 ---
 
+# Part 0 — Processing queue
+
+The sources below, sorted into processing categories. Work top to
+bottom within each category. `status` values: `todo`, `in-progress`,
+`blocked`, `done` — update the field as work happens so this table is
+always the live state.
+
+## Category 1 — Already georeferenced: ingest directly
+
+| # | Source | Era | Resolution | License | Next action | Status |
+|---|--------|-----|-----------|---------|-------------|--------|
+| 1.1 | CORONA Atlas (A/1) | 1967–1972 | 1.8–2.7 m | CC BY-SA 4.0 footer vs "non-commercial" prose — email CAST | Pull Hama frame via WMTS, compare against our hand-aligned KH-7 reference; then per-city GeoTIFFs | todo |
+| 1.2 | Copernicus DEM GLO-30 (B11) | current | 30 m terrain | open, attribution | Hillshade layer under film scenes | todo |
+| 1.3 | HOT OSM Syria extracts (B12) | current | vector | ODbL | Arabic place names for UI; reference vectors | todo |
+| 1.4 | UNOSAT damage vectors (B9) | 2013–2023 | building-level vector | free w/ attribution | Download per-city sets from HDX; hold for timeline UI | todo |
+| 1.5 | EAMENA Zenodo GeoJSON (A/4) | current | site points | CC BY 4.0 | Fetch published Syria datasets only (no coordinate re-publishing beyond them) | todo |
+
+## Category 2 — Easy alignment: scanned maps with printed grids
+
+| # | Source | Era | Scale | License | Next action | Status |
+|---|--------|-----|-------|---------|-------------|--------|
+| 2.1 | AMS K922 Damascus + Aleppo city plans (B2) | 1958 | 1:10,000 | public domain | Locate LOC item URLs (browser needed), download, georeference by grid | todo |
+| 2.2 | Levant 1:50,000 Mandate series (B3) | 1927–1945 | 1:50,000 | pre-1946 French military; check per-item | Inspect Nakala datasets + LOC holdings; list sheets covering our cities | todo |
+| 2.3 | AMS K502 sheets at ANU (B4) | 1950s | 1:250,000 | out of copyright | Download Syria sheets from ANU repository | todo |
+| 2.4 | AMS K521/K421 at UT Austin (B4) | 1941–42 | 1:200k/1:500k | public domain | Download from PCL pages | todo |
+| 2.5 | Gallica Mandate-era maps (B5) | 1930s | small/medium | BnF non-commercial | Pull via IIIF as context layers | todo |
+
+## Category 3 — Standard film pipeline: scan/stitch/align by eye
+
+| # | Source | Era | Resolution | License | Next action | Status |
+|---|--------|-----|-----------|---------|-------------|--------|
+| 3.1 | KH-9 panoramic, Declass-3 (B1) | 1971–1984 | sub-metre? VERIFY | public domain | EarthExplorer: check Damascus/Aleppo coverage + real GSD BEFORE any KH-7 scan order | todo |
+| 3.2 | U-2 frames (A/6) | 1958–1960 | ~0.5 m | public domain | Download Hammer & Ur index, intersect with city list, cost a NARA scan order; study Brown u2egypt code | todo |
+| 3.3 | SPOT SWH scenes (A/2) | 1986–2015 | 2.5–20 m | Etalab 2.0 (verify at download) | Register, inventory Syria via OpenSearch API; prefer waiting for ortho L2 | todo |
+| 3.4 | NCAP Project ROBIN + Syria holdings (B6) | 1956 | aerial | NCAP/HES, paid scans | Browse Syria page, get scan quote for coastal cities | todo |
+
+## Category 4 — Blocked or watch
+
+| # | Source | Blocker | Status |
+|---|--------|---------|--------|
+| 4.1 | SPOT ortho Level 2 (Magellium) | not yet released for our area — watch | blocked |
+| 4.2 | Soviet Genshtab topo maps (B8) | unresolved copyright — reference only, no re-hosting | blocked |
+| 4.3 | Luftwaffe GX over Syria (B7) | existence for Syria unproven — needs NARA RG 373 finding-aid check | blocked |
+| 4.4 | UNESCO WHS data (B13) | restrictive terms — use OSM/Wikidata coordinates instead, or request permission | blocked |
+| 4.5 | Bavarian WWI Damascus frames (A/8) | needs archive enquiry via foundation | blocked |
+
+## Category 5 — Context only (oblique/ground; deferred by scope decision)
+
+BnF Armée du Levant aerials, Poidebard/USJ, Ifpo MédiHAL obliques,
+Syrian Heritage Archive, APAAME Syria slides. Revisit when per-site
+context pages are built.
+
+## Category 6 — Closed (verified negatives, Part C)
+
+KH-5/KH-6, Hunting Syria, IGN Remonter le temps, OpenAerialMap Syria,
+Soviet film imagery brokers.
+
+---
+
 # Part A — Original entries, now verified
 
 ## 1. CORONA Atlas of the Middle East — University of Arkansas CAST
