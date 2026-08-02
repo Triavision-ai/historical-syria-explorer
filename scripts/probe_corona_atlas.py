@@ -17,8 +17,8 @@ result; only transport/parse failures exit non-zero.
 """
 
 import os
+import re
 import sys
-import xml.etree.ElementTree as ET
 
 import requests
 
@@ -51,27 +51,31 @@ def fetch_capabilities():
     return r.text
 
 
-def parse_layers(caps_xml):
-    """Return [(layer_name, (minx, miny, maxx, maxy))] for EPSG:4326 corona tilesets."""
-    root = ET.fromstring(caps_xml)
+def parse_layers(caps_text):
+    """Return [(layer_name, (minx, miny, maxx, maxy))] for EPSG:4326 corona tilesets.
+
+    Deliberately NOT a strict XML parse: the service's GetCapabilities
+    uses namespace prefixes without declaring them (ElementTree raises
+    "unbound prefix"), so extract the <TileSet> blocks textually.
+    """
     layers = []
-    for tileset in root.iter():
-        if not tileset.tag.endswith("TileSet"):
+    for block in re.findall(r"<TileSet\b.*?</TileSet>", caps_text, flags=re.S):
+        name_m = re.search(r"<Layers>\s*(corona:[^<\s]+)\s*</Layers>", block)
+        srs_m = re.search(r"<SRS>\s*([^<\s]+)\s*</SRS>", block)
+        bb_m = re.search(r"<BoundingBox\b[^>]*>", block)
+        if not (name_m and bb_m):
             continue
-        name, srs, bbox = None, None, None
-        for child in tileset:
-            tag = child.tag.rsplit("}", 1)[-1]
-            if tag == "Layers":
-                name = (child.text or "").strip()
-            elif tag == "SRS":
-                srs = (child.text or "").strip()
-            elif tag == "BoundingBox":
-                srs_attr = child.get("SRS") or child.get("srs") or ""
-                bbox = tuple(float(child.get(k)) for k in ("minx", "miny", "maxx", "maxy"))
-                if srs_attr and srs_attr != "EPSG:4326":
-                    bbox = None
-        if name and name.startswith("corona:") and bbox and (srs in (None, "EPSG:4326")):
-            layers.append((name, bbox))
+        if srs_m and srs_m.group(1) != "EPSG:4326":
+            continue
+        bb_tag = bb_m.group(0)
+        attrs = dict(re.findall(r'([A-Za-z]+)="([^"]*)"', bb_tag))
+        if attrs.get("SRS", "EPSG:4326") != "EPSG:4326":
+            continue
+        try:
+            bbox = tuple(float(attrs[k]) for k in ("minx", "miny", "maxx", "maxy"))
+        except (KeyError, ValueError):
+            continue
+        layers.append((name_m.group(1), bbox))
     return layers
 
 
