@@ -33,7 +33,7 @@ always the live state.
 
 | # | Source | Era | Resolution | License | Next action | Status |
 |---|--------|-----|-----------|---------|-------------|--------|
-| 1.1 | CORONA Atlas (A/1) | 1967–1972 | 1.8–2.7 m | CC BY-SA 4.0 footer vs "non-commercial" prose — email CAST | Pull Hama frame via WMTS, compare against our hand-aligned KH-7 reference; then per-city GeoTIFFs | todo |
+| 1.1 | CORONA Atlas (A/1) | 1967–1972 | 1.8–2.7 m | CC BY-SA 4.0 footer vs "non-commercial" prose — email CAST | probe-corona-atlas.yml lists covering layers + samples per city (endpoint: geoserve.cast.uark.edu GeoServer, from the CAST Corona Clicker plugin); then compare Hama sample against our hand-aligned KH-7 reference | in-progress |
 | 1.2 | Copernicus DEM GLO-30 (B11) | current | 30 m terrain | open, attribution | Hillshade layer under film scenes | todo |
 | 1.3 | HOT OSM Syria extracts (B12) | current | vector | ODbL | Arabic place names for UI; reference vectors | todo |
 | 1.4 | UNOSAT damage vectors (B9) | 2013–2023 | building-level vector | free w/ attribution | Download per-city sets from HDX; hold for timeline UI | todo |
