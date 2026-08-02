@@ -1,0 +1,37 @@
+name: Probe CORONA Atlas coverage
+
+# Read-only reconnaissance of the CORONA Atlas (CAST, University of
+# Arkansas) for docs/SOURCES.md queue item 1.1: which orthorectified
+# CORONA layers cover the Syrian cities, plus one small sample image per
+# city for by-eye inspection. No secrets used; results are run artifacts
+# only - nothing is committed or uploaded to R2.
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Probe the Atlas
+        run: |
+          pip install --quiet requests
+          python scripts/probe_corona_atlas.py
+      - name: Publish summary
+        if: always()
+        run: |
+          if [ -f probe-output/report.md ]; then
+            cat probe-output/report.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: corona-atlas-probe
+          path: probe-output/
+          if-no-files-found: warn
+          retention-days: 30
