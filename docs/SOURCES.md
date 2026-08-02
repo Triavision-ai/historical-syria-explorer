@@ -20,6 +20,13 @@ Scope decision (Ahmad, 2026-08-02): for now the project pursues
 GEOGRAPHICAL data only — georeferenced or georeferenceable imagery and
 maps. Ground-level photo collections are recorded but deferred.
 
+Human-control decision (Ahmad, 2026-08-02): NO bulk downloading or
+ingestion of external imagery. Every scene passes a human gate first:
+a small sample is fetched (fetch-corona-sample.yml), Ahmad approves or
+rejects it by eye, the verdict is recorded in the coverage registry
+(who/when), and ingestion workflows process ONLY approved scenes, one
+per manual dispatch. Probes and samples stay small and read-only.
+
 ---
 
 # Part 0 — Processing queue
