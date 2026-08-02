@@ -18,6 +18,14 @@ Statuses: `corroborated` (multiple independent secondary sources),
 `confirmed` (a project member verified the primary source first-hand —
 record who/when).
 
+Scope decision (Ahmad, 2026-08-02): for now the project pursues
+GEOGRAPHICAL data only — georeferenced or georeferenceable imagery and
+maps that can be placed on the map. In-scope: CORONA Atlas (1), SPOT
+(2), U-2 (6), French Mandate aerial (7), WWI aerial (8), and EAMENA's
+site coordinates (4) as a map overlay. Deferred: ground-level photo
+collections (3, and the non-aerial parts of 5 and 7) — valuable later
+for per-site context pages, not now.
+
 ---
 
 ## 1. CORONA Atlas of the Middle East — University of Arkansas CAST
