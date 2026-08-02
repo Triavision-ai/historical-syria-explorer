@@ -1,0 +1,101 @@
+name: Fetch a CORONA Atlas sample image
+
+# Fetches one GetMap sample from the CORONA Atlas for a given place and
+# layer and commits it under docs/samples/ so it can be viewed directly
+# (raw.githubusercontent.com works where run artifacts do not). Samples
+# are small single PNGs for by-eye checks, not imagery hosting - real
+# imagery lives in R2 via the tile pipeline.
+
+on:
+  workflow_dispatch:
+    inputs:
+      place_id:
+        description: 'Place id from public/catalog/places.json'
+        required: true
+        default: 'hama'
+      layer:
+        description: 'corona: layer name (defaults to the first confirmed layer in corona-atlas-coverage.json)'
+        required: false
+        default: ''
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      # Inputs are untrusted text: validate shape before any use.
+      - name: Validate inputs
+        env:
+          PLACE: ${{ inputs.place_id }}
+          LAYER: ${{ inputs.layer }}
+        run: |
+          set -euf
+          [[ "$PLACE" =~ ^[a-z0-9-]+$ ]] || { echo "bad place_id"; exit 1; }
+          [[ -z "$LAYER" || "$LAYER" =~ ^corona:[A-Za-z0-9._-]+$ ]] || { echo "bad layer"; exit 1; }
+      - name: Fetch sample
+        env:
+          PLACE: ${{ inputs.place_id }}
+          LAYER: ${{ inputs.layer }}
+        run: |
+          pip install --quiet requests
+          python - <<'EOF'
+          import json, os, sys
+          import requests
+
+          place_id = os.environ["PLACE"]
+          layer = os.environ["LAYER"].strip()
+          places = {p["id"]: p for p in json.load(open("public/catalog/places.json"))["places"]}
+          if place_id not in places:
+              sys.exit(f"unknown place: {place_id}")
+          if not layer:
+              coverage = json.load(open("public/catalog/corona-atlas-coverage.json"))["places"]
+              confirmed = coverage.get(place_id) or []
+              if not confirmed:
+                  sys.exit(f"no confirmed layer for {place_id}; pass one explicitly")
+              layer = confirmed[0]
+          p = places[place_id]
+          lon, lat, h = p["lon"], p["lat"], 0.045
+          r = requests.get(
+              "https://geoserve.cast.uark.edu/geoserver/wms",
+              params={
+                  "SERVICE": "WMS", "VERSION": "1.1.1", "REQUEST": "GetMap",
+                  "LAYERS": layer, "SRS": "EPSG:4326",
+                  "BBOX": f"{lon-h},{lat-h},{lon+h},{lat+h}",
+                  "WIDTH": 1600, "HEIGHT": 1600,
+                  "FORMAT": "image/png", "TRANSPARENT": "true",
+              },
+              headers={"User-Agent": "historical-syria-explorer-sample/1.0"},
+              timeout=180,
+          )
+          ct = r.headers.get("content-type", "")
+          if not (r.ok and ct.startswith("image/")):
+              sys.exit(f"GetMap failed: HTTP {r.status_code} {ct} {r.text[:200]}")
+          os.makedirs("docs/samples", exist_ok=True)
+          safe_layer = layer.split(":", 1)[1]
+          out = f"docs/samples/{place_id}-{safe_layer}.png"
+          with open(out, "wb") as f:
+              f.write(r.content)
+          print(f"saved {out} ({len(r.content)} bytes)")
+          EOF
+      - name: Commit sample
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/samples/
+          git diff --cached --quiet && { echo "nothing new"; exit 0; }
+          git commit -m "docs: CORONA Atlas sample image for by-eye check"
+          # Registry-file style retry: rebase-free, regenerate on latest main.
+          for i in 1 2 3; do
+            git push origin HEAD:main && exit 0
+            git fetch origin main && git reset --soft origin/main && git commit -m "docs: CORONA Atlas sample image for by-eye check" || true
+            sleep $((i * 2))
+          done
+          exit 1
