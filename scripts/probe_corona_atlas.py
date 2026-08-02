@@ -26,20 +26,16 @@ BASE = "https://geoserve.cast.uark.edu/geoserver"
 CAPS_URL = f"{BASE}/gwc/service/wms?REQUEST=GetCapabilities&tiled=true"
 UA = {"User-Agent": "historical-syria-explorer-probe/1.0 (open-source heritage project)"}
 
-CITIES = {
-    "Hama": (36.7578, 35.1318),
-    "Homs": (36.7184, 34.7268),
-    "Aleppo": (37.1612, 36.2021),
-    "Damascus": (36.2919, 33.5102),
-    "Latakia": (35.7796, 35.5196),
-    "Idlib": (36.6317, 35.9306),
-    "DeirEzZor": (40.1408, 35.3359),
-    "Raqqa": (39.0079, 35.9528),
-    "Palmyra": (38.2687, 34.5560),
-    "Qamishli": (41.2262, 37.0522),
-    "Daraa": (36.1021, 32.6189),
-    "Tartus": (35.8867, 34.8886),
-}
+PLACES_FILE = os.path.join(os.path.dirname(__file__), "..", "public", "catalog", "places.json")
+
+
+def load_places():
+    """Canonical place list -> {id: (lon, lat)}. See public/catalog/places.json."""
+    import json
+
+    with open(PLACES_FILE) as f:
+        data = json.load(f)
+    return {p["id"]: (p["lon"], p["lat"]) for p in data["places"]}
 
 SAMPLE_HALF_DEG = 0.045  # ~5 km half-width sample window
 SAMPLE_PX = 1024
@@ -118,7 +114,7 @@ def main():
     layers = parse_layers(caps)
     report.append(f"Total `corona:` EPSG:4326 tile layers advertised: **{len(layers)}**")
     report.append("")
-    for city, (lon, lat) in CITIES.items():
+    for city, (lon, lat) in load_places().items():
         hits = covering(layers, lon, lat)
         report.append(f"## {city}  ({lon}, {lat})")
         if not hits:
