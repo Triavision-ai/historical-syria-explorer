@@ -1,0 +1,194 @@
+name: Archive an original scan to R2
+
+# Inspection station in front of the tiling pipeline (decision of
+# 2026-08-04): downloads one scene's original USGS film scan and stores
+# it in R2 under scans/<entityId>/ so a human can inspect and
+# georeference it BEFORE any expensive tiling happens.
+#
+# Per scene it stores:
+#   scans/<id>/original/  - the delivered files, byte-for-byte untouched
+#   scans/<id>/cog/       - lossless (DEFLATE) cloud-optimized GeoTIFF per
+#                           segment plus mosaic.tif of all segments stacked,
+#                           streamable directly into QGIS via the public URL
+#   scans/<id>/preview/   - one ~4000px JPEG per segment for quick viewing
+#                           in any browser (preview only; originals above)
+# and registers everything in public/catalog/scans.json.
+#
+# One scene per manual dispatch - no bulk archiving.
+
+on:
+  workflow_dispatch:
+    inputs:
+      entity_id:
+        description: 'Scene entity id, e.g. DZB1206-500074L008001'
+        required: true
+      dataset:
+        description: 'M2M dataset (declassii | declassiii | ...)'
+        required: true
+        default: 'declassii'
+
+permissions:
+  contents: write
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      # Dispatch inputs are untrusted text: validate shape first, with no
+      # secrets in scope, before any privileged step runs.
+      - name: Validate inputs (no secrets in this step)
+        env:
+          ENTITY_ID: ${{ inputs.entity_id }}
+          DATASET: ${{ inputs.dataset }}
+        run: |
+          set -eu
+          [[ "$ENTITY_ID" =~ ^[A-Za-z0-9_-]+$ ]] \
+            || { echo "entity_id rejected: single id [A-Za-z0-9_-] expected"; exit 1; }
+          [[ "$DATASET" =~ ^[a-z0-9]+$ ]] \
+            || { echo "dataset rejected: lowercase alphanumeric id expected"; exit 1; }
+          echo "inputs validated"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install GDAL
+        run: sudo apt-get update -q && sudo apt-get install -y -q gdal-bin unzip
+
+      - name: Download product from USGS
+        id: download
+        env:
+          USGS_M2M_USERNAME: ${{ secrets.USGS_M2M_USERNAME }}
+          USGS_M2M_TOKEN: ${{ secrets.USGS_M2M_TOKEN }}
+          ENTITY_ID: ${{ inputs.entity_id }}
+          DATASET: ${{ inputs.dataset }}
+        run: |
+          OUT=$(node scripts/download-declass.mjs "$ENTITY_ID" "$DATASET" /tmp/dl)
+          echo "$OUT"
+          echo "file=$(echo "$OUT" | tail -1)" >> "$GITHUB_OUTPUT"
+          ls -lh /tmp/dl
+
+      - name: Extract archive if needed
+        env:
+          FILE: ${{ steps.download.outputs.file }}
+        run: |
+          mkdir -p /tmp/original
+          case "$FILE" in
+            *.zip) unzip -o "$FILE" -d /tmp/original ;;
+            *.tar.gz|*.tgz) tar -xzf "$FILE" -C /tmp/original ;;
+            *.tar) tar -xf "$FILE" -C /tmp/original ;;
+            *) cp "$FILE" /tmp/original/ ;;
+          esac
+          find /tmp/original -type f -exec ls -lh {} \;
+
+      - name: Build lossless COGs and previews
+        run: |
+          set -e
+          mkdir -p /tmp/cog /tmp/preview
+          mapfile -t TIFS < <(find /tmp/original -type f \( -iname '*.tif' -o -iname '*.tiff' \) | sort)
+          [ "${#TIFS[@]}" -gt 0 ] || { echo "no raster segments found"; exit 1; }
+          for tif in "${TIFS[@]}"; do
+            base=$(basename "$tif"); base="${base%.*}"
+            # DEFLATE is lossless - the COG carries the identical pixels,
+            # just tiled with overviews so QGIS can stream it remotely.
+            gdal_translate -of COG -co COMPRESS=DEFLATE -co PREDICTOR=2 \
+              -co BIGTIFF=YES --config GDAL_NUM_THREADS ALL_CPUS \
+              "$tif" "/tmp/cog/${base}.tif"
+            gdal_translate -of JPEG -outsize 4000 0 -co QUALITY=85 \
+              "$tif" "/tmp/preview/${base}.jpg"
+          done
+          # All segments stacked vertically in filename order (the same
+          # sort prepare-frame.mjs uses) so QGIS control points measured
+          # on the mosaic transfer 1:1 to the tiling pipeline's mosaic.
+          if [ "${#TIFS[@]}" -gt 1 ]; then
+            WIDTHS=$(for t in "${TIFS[@]}"; do gdalinfo "$t" | sed -n 's/^Size is \([0-9]*\),.*/\1/p'; done | sort -u | wc -l)
+            if [ "$WIDTHS" = "1" ]; then
+              python3 - <<'EOF'
+          import subprocess, sys, glob
+          tifs = sorted(glob.glob('/tmp/original/**/*.tif', recursive=True) + glob.glob('/tmp/original/**/*.tiff', recursive=True))
+          sizes = []
+          for t in tifs:
+              out = subprocess.run(['gdalinfo', t], capture_output=True, text=True).stdout
+              for line in out.splitlines():
+                  if line.startswith('Size is'):
+                      w, h = line.replace('Size is', '').split(',')
+                      sizes.append((t, int(w), int(h)))
+          width = sizes[0][1]
+          total = sum(h for _, _, h in sizes)
+          vrt = ['<VRTDataset rasterXSize="%d" rasterYSize="%d">' % (width, total),
+                 '<VRTRasterBand dataType="Byte" band="1">']
+          y = 0
+          for t, w, h in sizes:
+              vrt.append(
+                  f'<SimpleSource><SourceFilename relativeToVRT="0">{t}</SourceFilename>'
+                  f'<SourceBand>1</SourceBand><SrcRect xOff="0" yOff="0" xSize="{w}" ySize="{h}"/>'
+                  f'<DstRect xOff="0" yOff="{y}" xSize="{w}" ySize="{h}"/></SimpleSource>')
+              y += h
+          vrt += ['</VRTRasterBand>', '</VRTDataset>']
+          open('/tmp/mosaic.vrt', 'w').write('\n'.join(vrt))
+          print('mosaic:', width, 'x', total)
+          EOF
+              gdal_translate -of COG -co COMPRESS=DEFLATE -co PREDICTOR=2 \
+                -co BIGTIFF=YES --config GDAL_NUM_THREADS ALL_CPUS \
+                /tmp/mosaic.vrt /tmp/cog/mosaic.tif
+            else
+              echo "segments differ in width - skipping mosaic (per-segment COGs still uploaded)"
+            fi
+          fi
+          ls -lh /tmp/cog /tmp/preview
+
+      - name: Upload to R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          ENTITY_ID: ${{ inputs.entity_id }}
+        run: |
+          ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          aws s3 sync /tmp/original "s3://syria-tiles/scans/$ENTITY_ID/original" \
+            --endpoint-url "$ENDPOINT" --no-progress --only-show-errors
+          aws s3 sync /tmp/cog "s3://syria-tiles/scans/$ENTITY_ID/cog" \
+            --endpoint-url "$ENDPOINT" --no-progress --only-show-errors
+          aws s3 sync /tmp/preview "s3://syria-tiles/scans/$ENTITY_ID/preview" \
+            --endpoint-url "$ENDPOINT" --no-progress --only-show-errors
+          echo "uploaded: $(find /tmp/original /tmp/cog /tmp/preview -type f | wc -l) files"
+
+      - name: Register in scans manifest
+        env:
+          ENTITY_ID: ${{ inputs.entity_id }}
+          DATASET: ${{ inputs.dataset }}
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Parallel runs race on this file: on every retry, regenerate the
+          # entry on latest main (never pull --rebase here - see CLAUDE.md).
+          for attempt in 1 2 3; do
+            git fetch origin main && git checkout -B main origin/main
+            python3 - <<'EOF'
+          import json, os, subprocess
+          path = 'public/catalog/scans.json'
+          data = json.load(open(path)) if os.path.exists(path) else {"note": "Original USGS scans archived in R2 under scans/<entityId>/ (original|cog|preview). Public base: same bucket as tiles.", "scenes": {}}
+          entity = os.environ['ENTITY_ID']
+          files = {}
+          for sub in ('original', 'cog', 'preview'):
+              root = {'original': '/tmp/original', 'cog': '/tmp/cog', 'preview': '/tmp/preview'}[sub]
+              out = []
+              for dirpath, _dirs, names in os.walk(root):
+                  for n in sorted(names):
+                      p = os.path.join(dirpath, n)
+                      out.append({"file": n, "bytes": os.path.getsize(p)})
+              files[sub] = out
+          data['scenes'][entity] = {"dataset": os.environ['DATASET'], "files": files}
+          json.dump(data, open(path, 'w'), indent=1, sort_keys=True)
+          EOF
+            git add public/catalog/scans.json
+            git commit -m "catalog: archive original scan $ENTITY_ID to R2" || exit 0
+            git push origin main && exit 0 || sleep $((attempt * 3))
+          done
+          exit 1
