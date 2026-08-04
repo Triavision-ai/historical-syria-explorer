@@ -120,6 +120,15 @@
         return `${base}/${z}/${x}/${y}.png`;
       }
 
+      /** Detail budget for "Sharpen here": match the real screen, not a
+       *  fixed 2048. A phone asks for little, a desktop for a lot, so the
+       *  film is shown at its native detail without wasting requests. */
+      function screenDetailPx() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 3);
+        const wide = Math.max(window.innerWidth, window.innerHeight) * dpr;
+        return Math.round(Math.max(2048, Math.min(6144, wide * 1.25)));
+      }
+
       /** Stitch the scene's tiles over [w,s,e,n] into one canvas (≤ maxPx wide). */
       async function buildSnapshot(id, entry, bounds, maxPx = 2048) {
         const [w, s, e, n] = bounds;
@@ -145,7 +154,19 @@
           [x2lon(x0, z), y2lat(y0, z)], [x2lon(x1 + 1, z), y2lat(y0, z)],
           [x2lon(x1 + 1, z), y2lat(y1 + 1, z)], [x2lon(x0, z), y2lat(y1 + 1, z)],
         ];
-        return { url: canvas.toDataURL('image/png'), quad };
+        // A blob URL, not a data URL: at full screen detail the PNG is tens
+        // of megabytes and base64-ing it into a string would stall the tab.
+        const url = await new Promise((resolve) =>
+          canvas.toBlob((blob) => resolve(URL.createObjectURL(blob)), 'image/png'),
+        );
+        return { url, quad, zoom: z, px: canvas.width };
+      }
+
+      /** Blob URLs are ours to free; drop the previous one when replacing. */
+      const objectUrls = {};
+      function setObjectUrl(key, url) {
+        if (objectUrls[key]) URL.revokeObjectURL(objectUrls[key]);
+        objectUrls[key] = url;
       }
 
       // ---- geometry: similarity transform about the pivot, in local meters ----
@@ -206,6 +227,7 @@
         state.boundsQuad = [[w, n], [e, n], [e, s], [w, s]];
         map.fitBounds([[w, s], [e, n]], { padding: 40, duration: 0 });
         const snap = await buildSnapshot(id, state.entry, state.entry.bounds);
+        setObjectUrl('old', snap.url);
         state.baseQuad = snap.quad;
         for (const layer of ['old', 'patch']) {
           if (map.getLayer(layer)) map.removeLayer(layer);
@@ -237,14 +259,17 @@
         const s = Math.max(bs, Math.min(...pts.map((p) => p[1])));
         const n = Math.min(bn, Math.max(...pts.map((p) => p[1])));
         if (!(w < e && s < n)) { $('status').textContent = 'The scene is not in view.'; return; }
-        const snap = await buildSnapshot(state.sceneId, state.entry, [w, s, e, n], 2048);
+        const snap = await buildSnapshot(state.sceneId, state.entry, [w, s, e, n], screenDetailPx());
+        setObjectUrl('patch', snap.url);
         state.patchQuad = snap.quad;
         if (map.getLayer('patch')) map.removeLayer('patch');
         if (map.getSource('patch')) map.removeSource('patch');
         map.addSource('patch', { type: 'image', url: snap.url, coordinates: transformed(inFrame(snap.quad)) });
         map.addLayer({ id: 'patch', type: 'raster', source: 'patch',
           paint: { 'raster-opacity': Number($('opacity').value) / 100, 'raster-fade-duration': 0 } });
-        $('status').textContent = 'Sharp view loaded — align, then 🔍 again after big moves.';
+        const capped = snap.zoom < state.entry.maxZoom;
+        $('status').textContent =
+          `Sharp view at z${snap.zoom}${capped ? ` (native is z${state.entry.maxZoom} — zoom in and press 🔍 again for full detail)` : ' — full native detail'}`;
         refresh();
       }
 
