@@ -11,7 +11,7 @@ what a scene really contains before aligning it.
 
 | Entity ID | Area | Date | Mission | Native res | Alignment |
 |---|---|---|---|---|---|
-| DZB00402700090H020001 | Hama | 1966-04-25 | KH-7 | 0.6 m | human-verified (Ahmad, mirrored) |
+| DZB00402700090H020001 | Hama | 1966-04-25 | KH-7 | 0.6 m | human-verified for the Hama panel only - multi-frame scan, see below |
 | DZB1206-500074L008001 | Aleppo | 1973-08-01 | KH-9 | 0.6 m | archive corners, pending |
 | DZB1206-500016L011001 | Latakia | 1973-07-18 | KH-9 | 0.6 m | archive corners, pending |
 | DZB1205-500082L008001 | Deir ez-Zor | 1973-03-28 | KH-9 | 0.6 m | archive corners, pending |
@@ -44,11 +44,19 @@ e.g. `.../tiles/DZB1205-500082L008001/12/2470/1650.png`
 
 ## Open issue: one scan can hold SEVERAL camera frames
 
-Observed by Ahmad in the align tool (2026-08-03, Deir ez-Zor-type
-scene): a scanned segment can contain multiple separate exposures
+Observed by Ahmad in the align tool (2026-08-03) on
+DZB00402700090H020001 - the HAMA KH-7 scene, i.e. the project's
+human-verified reference: the scan contains multiple separate exposures
 stacked along the film, each with its own black border and USGS frame
-annotations (e.g. ...020, ...033, ...040), and each covering a
-DIFFERENT piece of ground.
+annotations (visible numbers ...020, ...033, ...040), and each covering
+a DIFFERENT piece of ground.
+
+That the reference scene is itself multi-frame is the important part:
+Ahmad's 2026-07-22 hand alignment is valid for the panel he matched
+(the one containing Hama) and cannot also be correct for the other
+panels in the same scan. Hama-the-city is therefore still trustworthy;
+the rest of that scene's footprint is not, and should not be presented
+as aligned imagery.
 
 Why it matters: the pipeline maps one scan to one set of four corners
 and the align tool applies ONE similarity transform to the whole image.
