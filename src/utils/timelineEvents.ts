@@ -33,6 +33,10 @@ export function timelineEvents(scenes: ImageScene[]): TimelineEvent[] {
   for (const scene of scenes) {
     if (!scene.captureDate) continue;
     if (scene.metadata['displayable'] !== true && !scene.previewUrl) continue;
+    // Scenes placed only by unverified archive corners render nothing
+    // (their preview drape is disabled) — no picture, no timeline event.
+    if (scene.metadata['approximatePlacement'] === true && scene.metadata['tiled'] !== true)
+      continue;
     const key = timelineEventKey(scene);
     const group = groups.get(key);
     if (group) group.push(scene);

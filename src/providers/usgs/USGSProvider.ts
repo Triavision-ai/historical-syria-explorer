@@ -20,6 +20,15 @@ import { loadTilesManifest, tileUrlTemplate } from './tilesManifest';
 const DECLASS_DATASETS = ['declassi', 'declassii', 'declassiii'];
 
 /**
+ * Whether scenes WITHOUT a verified tile pyramid may drape their USGS
+ * browse preview on the map. Off since 2026-08-04: archive corners are
+ * systematically wrong (see docs/SCENES.md geometry audit), so the
+ * preview renders kilometres off and sometimes mirrored. Flip back only
+ * together with honest "approximate placement" labelling in the UI.
+ */
+const SHOW_UNVERIFIED_PREVIEWS = false;
+
+/**
  * USGS declassified imagery provider (CORONA KH-4, GAMBIT KH-7, HEXAGON KH-9,
  * 1960–1984).
  *
@@ -112,6 +121,15 @@ export class USGSProvider implements ImageryProvider {
       };
     }
 
+    // Archive corner coordinates are systematically wrong (measured
+    // 2026-08: Hama 24% undersized + mirrored, Latakia 11% + mirrored,
+    // Idlib/Homs outside their own footprints), so draping the USGS
+    // browse preview at those corners shows imagery kilometres off and
+    // sometimes mirrored — worse than showing nothing. Hidden by
+    // decision of 2026-08-04 until previews carry honest "approximate"
+    // labelling; scenes stay listed with metadata and ordering links.
+    if (!SHOW_UNVERIFIED_PREVIEWS) return null;
+
     if (!scene.previewUrl) return null;
     const [w, s, e, n] = scene.bounds;
     return {
@@ -152,7 +170,9 @@ export class USGSProvider implements ImageryProvider {
       const entityId = scene.id.replace(`${this.id}:`, '');
       return tiled[entityId]
         ? { ...scene, metadata: { ...scene.metadata, tiled: true, displayable: true } }
-        : scene;
+        : // Placement comes from unverified archive corners only — the
+          // timeline and map must not promise a picture for these.
+          { ...scene, metadata: { ...scene.metadata, approximatePlacement: true } };
     });
     const matches = withFlags.filter((scene) => {
       if (query.dateFrom && scene.captureDate < query.dateFrom) return false;
