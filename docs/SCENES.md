@@ -42,6 +42,52 @@ the DZB12xx frames are KH-9).
 Base: `https://pub-f8ac6c500eea43b28591b7b636fc9e3d.r2.dev/tiles/<entityId>/{z}/{x}/{y}.png`
 e.g. `.../tiles/DZB1205-500082L008001/12/2470/1650.png`
 
+## Geometry audit, 2026-08-03
+
+Every tiled scene checked by measuring its corners.json quad (side
+lengths, diagonals) and testing whether its target city falls inside
+that quad. Inputs: public/tiles/corners.json and
+public/catalog/places.json - reproducible offline, no network.
+
+| Scene | Footprint | Shape | Target city |
+|---|---|---|---|
+| DZB00402700090H020001 (Hama, hand-aligned) | 20.5 x 53.0 km | near-rectangular, diagonals 57.3 / 57.1 | Hama inside |
+| DZB1206-500074L008001 (Aleppo) | 118.6 x 237.2 km | exact parallelogram, aspect 0.500 | Aleppo inside |
+| DZB1206-500016L011001 (Latakia) | 117.8 x 235.6 km | exact parallelogram, aspect 0.500 | Latakia inside |
+| DZB1205-500082L008001 (Deir ez-Zor) | 115.9 x 232.0 km | exact parallelogram, aspect 0.499 | Deir ez-Zor inside |
+| DZB1210-500023L001001 (Idlib) | 119.4 x 239.3 km | exact parallelogram, aspect 0.499 | Idlib OUTSIDE, ~4 km north of the edge |
+| DZB1210-500184L001001 (Homs/Damascus) | 118.9 x 238.2 km | exact parallelogram, aspect 0.499 | Homs OUTSIDE, ~3 km east of the edge |
+| D3C1209-400566A011 (Raqqa) | 303 km long, sides 16.8 vs 36.9 km | INVALID: not a parallelogram, diagonals 292.8 / 304.3 | Raqqa OUTSIDE |
+
+Findings:
+
+1. D3C1209-400566A011 is malformed. Opposite sides differ by more than
+   a factor of two (16.8 vs 36.9 km) and the diagonals differ by 12 km,
+   which no camera frame can produce. Its implied 18:1 stretch also
+   disagrees with the USGS browse quicklook of the same entity, which
+   reads roughly 10:1 - so the imagery is stretched about 1.8x along
+   the strip. Hand alignment cannot fix this; the corners must be
+   corrected first. (Earlier note in this file called a long thin strip
+   implausible for this camera - wrong: the browse confirms the frame
+   IS a long strip. The defect is the inconsistent quad, not its
+   thinness.)
+
+2. Idlib and Homs fall 3-4 km outside their own footprints. That is the
+   systematic archive-corner offset expressed as a number, consistent
+   with the film-border effect measured on Hama below.
+
+3. The five KH-9 footprints are suspiciously ideal: perfect
+   parallelograms, aspect exactly 0.500, matching diagonals. Real film
+   footprints are not that tidy - Hama's measured quad is 0.386. These
+   are very likely nominal rectangles supplied by the archive rather
+   than measured corners, which is a further reason they sit off the
+   ground truth.
+
+Practical consequence: Aleppo, Latakia and Deir ez-Zor have clean
+geometry with the target city inside, so by-eye alignment behaves
+predictably on them. Raqqa should be left alone until its corners are
+rebuilt.
+
 ## Open issue: film borders are inside the georeferenced mosaic
 
 Ahmad noticed (2026-08-03) that the Hama scene in the align tool looks
