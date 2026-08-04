@@ -42,21 +42,34 @@ the DZB12xx frames are KH-9).
 Base: `https://pub-f8ac6c500eea43b28591b7b636fc9e3d.r2.dev/tiles/<entityId>/{z}/{x}/{y}.png`
 e.g. `.../tiles/DZB1205-500082L008001/12/2470/1650.png`
 
-## Open issue: one scan can hold SEVERAL camera frames
+## Open issue: film borders are inside the georeferenced mosaic
 
-Observed by Ahmad in the align tool (2026-08-03) on
-DZB00402700090H020001 - the HAMA KH-7 scene, i.e. the project's
-human-verified reference: the scan contains multiple separate exposures
-stacked along the film, each with its own black border and USGS frame
-annotations (visible numbers ...020, ...033, ...040), and each covering
-a DIFFERENT piece of ground.
+Ahmad noticed (2026-08-03) that the Hama scene in the align tool looks
+like several stacked panels separated by black bars carrying USGS frame
+annotations (numbers ...020, ...033, ...040), while the USGS browse
+quicklook of the same entity is one clean continuous image.
 
-That the reference scene is itself multi-frame is the important part:
-Ahmad's 2026-07-22 hand alignment is valid for the panel he matched
-(the one containing Hama) and cannot also be correct for the other
-panels in the same scan. Hama-the-city is therefore still trustworthy;
-the rest of that scene's footprint is not, and should not be presented
-as aligned imagery.
+Resolved, and NOT multiple locations: USGS ships one frame as several
+scan segments (_a.tif, _b.tif, ...) and scripts/prepare-frame.mjs
+mosaics them (see its header comment). The panels are consecutive
+sections of the SAME exposure. The difference from the browse is that
+USGS trims the film edges for its quicklook, while our mosaic keeps the
+raw scan including the black film borders and their annotation blocks.
+
+The real problem this exposes: the archive corner coordinates describe
+the IMAGE area of the frame, but the mosaic they are pinned to also
+contains non-image film border. Mapping the four corners onto the outer
+corners of a mosaic that includes borders stretches and shifts the
+imagery relative to the ground - a systematic error, and a strong
+candidate explanation for the few-kilometre offsets seen on every
+archive-corner scene.
+
+Fix direction (not yet implemented): detect and crop the film borders
+(dark margins plus annotation blocks, and any inter-segment gaps)
+before building the GCP VRT, so the corners pin the image area only.
+Test: re-cut one pending scene with cropping and compare its offset
+against the current version. If confirmed, this improves every scene
+and makes hand alignment start much closer to correct.
 
 Why it matters: the pipeline maps one scan to one set of four corners
 and the align tool applies ONE similarity transform to the whole image.
