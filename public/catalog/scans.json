@@ -1,0 +1,52 @@
+{
+ "note": "Original USGS scans archived in R2 under scans/<entityId>/ (original|cog|preview). Public base: same bucket as tiles.",
+ "scenes": {
+  "DZB1206-500074L008001": {
+   "dataset": "declassii",
+   "files": {
+    "cog": [
+     {
+      "bytes": 1338416064,
+      "file": "DZB1206-500074L008001_a.tif"
+     },
+     {
+      "bytes": 1345153121,
+      "file": "DZB1206-500074L008001_b.tif"
+     },
+     {
+      "bytes": 2683359472,
+      "file": "mosaic.tif"
+     }
+    ],
+    "original": [
+     {
+      "bytes": 1279073948,
+      "file": "DZB1206-500074L008001_a.tif"
+     },
+     {
+      "bytes": 1279072964,
+      "file": "DZB1206-500074L008001_b.tif"
+     }
+    ],
+    "preview": [
+     {
+      "bytes": 7261542,
+      "file": "DZB1206-500074L008001_a.jpg"
+     },
+     {
+      "bytes": 3102,
+      "file": "DZB1206-500074L008001_a.jpg.aux.xml"
+     },
+     {
+      "bytes": 7326465,
+      "file": "DZB1206-500074L008001_b.jpg"
+     },
+     {
+      "bytes": 2907,
+      "file": "DZB1206-500074L008001_b.jpg.aux.xml"
+     }
+    ]
+   }
+  }
+ }
+}
