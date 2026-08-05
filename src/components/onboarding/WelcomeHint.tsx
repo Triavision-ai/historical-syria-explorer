@@ -42,6 +42,18 @@ export function WelcomeHint() {
       <p className="mt-2 text-xs text-gray-500">
         Tip: the ☁ percentage on each scene is cloud cover — lower is clearer.
       </p>
+      <p className="mt-2 text-xs text-gray-500">
+        Free and open source, supported by the{' '}
+        <a
+          href="https://github.com/German-Syrian-Research-Foundation"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-accent-400 hover:underline"
+        >
+          German-Syrian Research Foundation
+        </a>
+        .
+      </p>
       <button
         type="button"
         onClick={dismiss}

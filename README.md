@@ -12,6 +12,10 @@ The application is free to use, requires no account or registration, and works o
 
 This is an educational, non-commercial project under active development. It is at an early stage: parts of it work well, parts are incomplete, and it will take time to mature. Feedback and contributions are welcome.
 
+## Support
+
+This project is supported by the [German-Syrian Research Foundation](https://github.com/German-Syrian-Research-Foundation). The application remains free, open source, and non-commercial.
+
 ## What it does today
 
 - Explore like a map: pan and zoom anywhere in Syria, or search for a city, town, or village in Arabic or English, or by coordinates.
