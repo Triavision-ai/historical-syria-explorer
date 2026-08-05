@@ -24,6 +24,9 @@ export function MetadataPanel() {
     .filter(([key, value]) => !PROMINENT_KEYS.has(key) && isScalar(value))
     .slice(0, MAX_METADATA_ROWS);
   const orderingNote = scene.metadata['orderingNote'];
+  // The thumbnail is a tiny archive image and turns to mush at panel width;
+  // prefer the full browse image and fall back only when there is none.
+  const preview = scene.previewUrl ?? scene.thumbnail;
 
   return (
     <div className="flex h-full flex-col">
@@ -42,12 +45,24 @@ export function MetadataPanel() {
       </header>
 
       <div className="panel-scroll min-h-0 flex-1 overflow-y-auto px-4 py-3 text-sm">
-        {scene.thumbnail && (
-          <img
-            src={scene.thumbnail}
-            alt={`Preview of ${scene.mission} scene`}
-            className="mb-3 w-full rounded-lg border border-surface-600"
-          />
+        {preview && (
+          <a
+            href={preview}
+            target="_blank"
+            rel="noreferrer"
+            title="Open full-size preview"
+            className="group mb-3 block overflow-hidden rounded-lg border border-surface-600 bg-surface-800"
+          >
+            <img
+              src={preview}
+              alt={`Preview of ${scene.mission} scene`}
+              loading="lazy"
+              className="max-h-72 w-full object-contain"
+            />
+            <span className="block px-2 py-1 text-center text-[10px] text-gray-500 group-hover:text-gray-300">
+              Tap to open full size
+            </span>
+          </a>
         )}
 
         {sceneLayer && (

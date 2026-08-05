@@ -92,7 +92,7 @@ function SceneRow({
           selected ? 'bg-surface-700/70' : 'hover:bg-surface-800'
         }`}
       >
-        <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md bg-surface-800">
+        <div className="h-14 w-20 shrink-0 overflow-hidden rounded-md bg-surface-800">
           {scene.thumbnail ? (
             <img
               src={scene.thumbnail}
