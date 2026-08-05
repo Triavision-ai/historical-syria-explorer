@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { ExplorerMap } from '@/components/map/ExplorerMap';
 import { SearchBox } from '@/components/search/SearchBox';
 import { Timeline } from '@/components/timeline/Timeline';
@@ -20,6 +20,22 @@ export function HomePage() {
   const setActivePanel = useExplorerStore((state) => state.setActivePanel);
   const scenes = useExplorerStore((state) => state.scenes);
   const searchStatus = useExplorerStore((state) => state.searchStatus);
+  const footerRef = useRef<HTMLElement>(null);
+
+  // Publish the bottom controls' height so map credits can sit above them.
+  // The footer grows and shrinks (loading pill, compare buttons, timeline
+  // wrap), and on a phone a fixed offset would leave the expanded
+  // attribution covering the whole timeline.
+  useLayoutEffect(() => {
+    const footer = footerRef.current;
+    if (!footer) return;
+    const publish = () =>
+      document.documentElement.style.setProperty('--map-footer-h', `${footer.offsetHeight}px`);
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(footer);
+    return () => observer.disconnect();
+  }, []);
 
   // Load imagery for the default location (Hama Old City) on first paint.
   useEffect(() => {
@@ -46,17 +62,6 @@ export function HomePage() {
       </header>
 
       <WelcomeHint />
-
-      {/* Panel toggle (when closed) */}
-      {activePanel === null && (
-        <button
-          type="button"
-          onClick={() => setActivePanel('scenes')}
-          className="absolute right-3 bottom-32 z-30 rounded-xl border border-surface-600 bg-surface-900/90 px-3 py-2 text-xs font-semibold text-gray-100 shadow-lg backdrop-blur hover:bg-surface-700 sm:bottom-24"
-        >
-          {searchStatus === 'loading' ? 'Searching…' : `Scenes (${scenes.length})`}
-        </button>
-      )}
 
       {/* Scene / metadata panel */}
       {activePanel !== null && (
@@ -90,7 +95,25 @@ export function HomePage() {
       )}
 
       {/* Bottom controls */}
-      <footer className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex flex-col items-center gap-2 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <footer
+        ref={footerRef}
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex flex-col items-center gap-2 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+      >
+        {/* Panel toggle (when closed). Part of the footer stack rather than
+            free-floating, so its height is included in --map-footer-h and the
+            map credits park above it instead of covering it. */}
+        {activePanel === null && (
+          <div className="flex w-full max-w-3xl justify-end">
+            <button
+              type="button"
+              onClick={() => setActivePanel('scenes')}
+              className="pointer-events-auto rounded-xl border border-surface-600 bg-surface-900/90 px-3 py-2 text-xs font-semibold text-gray-100 shadow-lg backdrop-blur hover:bg-surface-700"
+            >
+              {searchStatus === 'loading' ? 'Searching…' : `Scenes (${scenes.length})`}
+            </button>
+          </div>
+        )}
+
         <div className="pointer-events-none flex items-center gap-2">
           <ViewControls />
           <LabelsToggle />

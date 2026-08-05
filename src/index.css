@@ -38,15 +38,24 @@ body,
   color: #9ca3af !important;
   font-size: 10px;
 }
-/* The timeline footer sits at z-30; without a higher z-index the expanded
-   attribution text disappears behind it. Wrap long credit lines instead of
-   letting them run under other controls. */
+/* Park the credits above the bottom controls (the footer publishes its own
+   height) instead of over the timeline, and keep them above the footer's
+   z-30 so the expanded text is never clipped. */
 .maplibregl-ctrl-bottom-right {
+  bottom: var(--map-footer-h, 0px);
   z-index: 35;
 }
 .maplibregl-ctrl-attrib.maplibregl-compact-show .maplibregl-ctrl-attrib-inner {
   max-width: min(70vw, 480px);
   white-space: normal;
+}
+
+/* Zoom buttons are a desktop nicety: on a phone they collide with the
+   stacked header, and pinch-zoom already covers the need. */
+@media (max-width: 639px) {
+  .maplibregl-ctrl-top-right {
+    display: none;
+  }
 }
 
 /* Thin dark scrollbars for panels */
