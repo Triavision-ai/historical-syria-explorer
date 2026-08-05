@@ -45,7 +45,7 @@ export function WelcomeHint() {
       <p className="mt-2 text-xs text-gray-500">
         Free and open source, supported by the{' '}
         <a
-          href="https://github.com/German-Syrian-Research-Foundation"
+          href="https://ds-fg.com"
           target="_blank"
           rel="noopener noreferrer"
           className="text-accent-400 hover:underline"

@@ -46,7 +46,7 @@ export function MapCanvas({
       attributionControl: {
         compact: true,
         customAttribution:
-          'Supported by the <a href="https://github.com/German-Syrian-Research-Foundation" target="_blank" rel="noopener noreferrer">German-Syrian Research Foundation</a>',
+          'Supported by the <a href="https://ds-fg.com" target="_blank" rel="noopener noreferrer">German-Syrian Research Foundation</a>',
       },
     });
     map.touchZoomRotate.enable();

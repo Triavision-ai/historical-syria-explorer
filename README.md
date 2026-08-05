@@ -14,7 +14,7 @@ This is an educational, non-commercial project under active development. It is a
 
 ## Support
 
-This project is supported by the [German-Syrian Research Foundation](https://github.com/German-Syrian-Research-Foundation). The application remains free, open source, and non-commercial.
+This project is supported by the [German-Syrian Research Foundation](https://ds-fg.com) ([GitHub](https://github.com/German-Syrian-Research-Foundation)). The application remains free, open source, and non-commercial.
 
 ## What it does today
 
