@@ -38,6 +38,16 @@ body,
   color: #9ca3af !important;
   font-size: 10px;
 }
+/* The timeline footer sits at z-30; without a higher z-index the expanded
+   attribution text disappears behind it. Wrap long credit lines instead of
+   letting them run under other controls. */
+.maplibregl-ctrl-bottom-right {
+  z-index: 35;
+}
+.maplibregl-ctrl-attrib.maplibregl-compact-show .maplibregl-ctrl-attrib-inner {
+  max-width: min(70vw, 480px);
+  white-space: normal;
+}
 
 /* Thin dark scrollbars for panels */
 .panel-scroll {
