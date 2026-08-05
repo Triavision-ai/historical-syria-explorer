@@ -1,5 +1,6 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import type { SceneLayer } from '@/types';
+import { PLACE_LABELS_LAYER_ID } from './basemapStyle';
 
 const OVERLAY_SOURCE_ID = 'scene-overlay-source';
 const OVERLAY_LAYER_ID = 'scene-overlay-layer';
@@ -33,15 +34,20 @@ export function setSceneOverlay(map: MapLibreMap, layer: SceneLayer | null, opac
     });
   }
 
-  map.addLayer({
-    id: OVERLAY_LAYER_ID,
-    type: 'raster',
-    source: OVERLAY_SOURCE_ID,
-    paint: {
-      'raster-opacity': opacity,
-      'raster-fade-duration': 150,
+  // Insert beneath the place-name overlay so toggled-on names stay
+  // readable over historical film.
+  map.addLayer(
+    {
+      id: OVERLAY_LAYER_ID,
+      type: 'raster',
+      source: OVERLAY_SOURCE_ID,
+      paint: {
+        'raster-opacity': opacity,
+        'raster-fade-duration': 150,
+      },
     },
-  });
+    map.getLayer(PLACE_LABELS_LAYER_ID) ? PLACE_LABELS_LAYER_ID : undefined,
+  );
 }
 
 export function setSceneOverlayOpacity(map: MapLibreMap, opacity: number): void {

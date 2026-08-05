@@ -4,7 +4,7 @@ import { SearchBox } from '@/components/search/SearchBox';
 import { Timeline } from '@/components/timeline/Timeline';
 import { SceneList } from '@/components/scenes/SceneList';
 import { MetadataPanel } from '@/components/scenes/MetadataPanel';
-import { ViewControls } from '@/components/controls/ViewControls';
+import { LabelsToggle, ViewControls } from '@/components/controls/ViewControls';
 import { WelcomeHint } from '@/components/onboarding/WelcomeHint';
 import { useExplorerStore } from '@/hooks/useExplorerStore';
 
@@ -91,7 +91,10 @@ export function HomePage() {
 
       {/* Bottom controls */}
       <footer className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex flex-col items-center gap-2 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-        <ViewControls />
+        <div className="pointer-events-none flex items-center gap-2">
+          <ViewControls />
+          <LabelsToggle />
+        </div>
         <div className="w-full max-w-3xl">
           <Timeline />
         </div>

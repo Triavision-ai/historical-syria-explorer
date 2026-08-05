@@ -17,6 +17,17 @@ export const ENDPOINTS = {
     'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
   basemapAttribution: 'Esri, Maxar, Earthstar Geographics, and the GIS User Community',
 
+  /**
+   * Optional place-name overlay (Esri World Boundaries and Places
+   * reference layer): transparent tiles with city/town/village names,
+   * used under the same Esri terms as the imagery basemap. Off by
+   * default — the interface stays imagery-only until the user toggles
+   * names on.
+   */
+  labelTiles:
+    env.VITE_LABEL_TILES ??
+    'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+
   /** USGS LandsatLook STAC API — public, no key, Landsat 1972–present. */
   landsatStac: env.VITE_LANDSAT_STAC ?? 'https://landsatlook.usgs.gov/stac-server',
 
