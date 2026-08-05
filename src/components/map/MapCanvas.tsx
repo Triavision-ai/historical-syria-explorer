@@ -43,7 +43,11 @@ export function MapCanvas({
       zoom: initialZoom,
       minZoom: MAP_CONFIG.minZoom,
       maxZoom: MAP_CONFIG.maxZoom,
-      attributionControl: { compact: true },
+      attributionControl: {
+        compact: true,
+        customAttribution:
+          'Supported by the <a href="https://github.com/German-Syrian-Research-Foundation" target="_blank" rel="noopener noreferrer">German-Syrian Research Foundation</a>',
+      },
     });
     map.touchZoomRotate.enable();
     // Surface tile/texture load failures (e.g. CORS-blocked overlay images)
