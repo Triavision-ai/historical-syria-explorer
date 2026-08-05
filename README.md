@@ -33,7 +33,7 @@ This project is supported by the [German-Syrian Research Foundation](https://git
 | Esri World Imagery Wayback                                      | 2014-present               | varies     | Map-publication snapshots for all of Syria; the label is the release date, not necessarily the local capture date, and local detail varies by place |
 | Maxar Open Data Program                                         | around the 2023 earthquake | ~0.4 m     | 1,422 scenes over northwest Syria                                                                                                                   |
 
-All sources are official and publicly licensed under their respective terms. The application does not scrape imagery, use Google historical imagery, or show map labels — the interface shows imagery only. It does rely on some external public services (the OpenStreetMap Nominatim geocoder, a tile-rendering proxy for some modern layers); these are used within their published terms.
+All sources are official and publicly licensed under their respective terms. The application does not scrape imagery or use Google historical imagery. The interface shows imagery only by default; an optional place-name layer (Esri reference tiles, used under the same terms as the basemap) can be switched on to identify cities, towns, and villages. It does rely on some external public services (the OpenStreetMap Nominatim geocoder, a tile-rendering proxy for some modern layers); these are used within their published terms.
 
 ### Full-resolution historical film
 

@@ -82,6 +82,32 @@ export function ViewControls() {
 }
 
 /**
+ * Show/hide the place-name overlay (cities, towns, villages). Always
+ * visible: knowing what place one is looking at matters most exactly when
+ * exploring unfamiliar villages on unlabeled imagery.
+ */
+export function LabelsToggle() {
+  const showLabels = useExplorerStore((state) => state.showLabels);
+  const setShowLabels = useExplorerStore((state) => state.setShowLabels);
+
+  return (
+    <button
+      type="button"
+      onClick={() => setShowLabels(!showLabels)}
+      aria-pressed={showLabels}
+      title={showLabels ? 'Hide place names' : 'Show place names'}
+      className={`pointer-events-auto rounded-xl border px-3 py-2 text-xs font-semibold shadow-lg backdrop-blur transition-colors ${
+        showLabels
+          ? 'border-accent-400/50 bg-accent-500 text-surface-950'
+          : 'border-surface-600 bg-surface-900/90 text-gray-300 hover:bg-surface-700'
+      }`}
+    >
+      Names
+    </button>
+  );
+}
+
+/**
  * One-tap entry into comparison: oldest sharp scene vs today. Shown when no
  * overlay is active yet, so comparing never requires digging in the list.
  */

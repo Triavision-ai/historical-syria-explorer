@@ -20,6 +20,22 @@ import {
 /** Fallback bbox padding (degrees) when no viewport is known (search / first load). */
 const SEARCH_BBOX_DELTA = 0.05;
 
+/**
+ * Must be declared before the store below: its initializer runs
+ * readStoredShowLabels() at module load, and a `const` further down would
+ * still be in its temporal dead zone — the catch would silently eat the
+ * ReferenceError and the stored preference would never load.
+ */
+const SHOW_LABELS_KEY = 'hse-show-labels';
+
+function readStoredShowLabels(): boolean {
+  try {
+    return localStorage.getItem(SHOW_LABELS_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 export type SearchStatus = 'idle' | 'loading' | 'done' | 'error';
 export type SidePanel = 'scenes' | 'metadata' | null;
 
@@ -41,6 +57,8 @@ interface ExplorerState {
   overlayOpacity: number;
   compareMode: boolean;
   activePanel: SidePanel;
+  /** Show the place-name overlay (cities, towns, villages) on the map. */
+  showLabels: boolean;
 
   /** Scene shown on the RIGHT side of compare; null = current-day basemap. */
   compareRightScene: ImageScene | null;
@@ -54,6 +72,7 @@ interface ExplorerState {
   setOverlayOpacity: (opacity: number) => void;
   setCompareMode: (enabled: boolean) => void;
   setActivePanel: (panel: SidePanel) => void;
+  setShowLabels: (enabled: boolean) => void;
   setCompareRight: (scene: ImageScene | null) => Promise<void>;
   /** One-tap: best oldest sharp scene on the left vs today's imagery. */
   quickCompare: () => Promise<void>;
@@ -101,6 +120,7 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
   overlayOpacity: 1,
   compareMode: false,
   activePanel: null,
+  showLabels: readStoredShowLabels(),
   compareRightScene: null,
   compareRightLayer: null,
 
@@ -198,6 +218,15 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
   setOverlayOpacity: (opacity) => set({ overlayOpacity: clamp01(opacity) }),
   setCompareMode: (enabled) => set({ compareMode: enabled }),
   setActivePanel: (panel) => set({ activePanel: panel }),
+
+  setShowLabels: (enabled) => {
+    try {
+      localStorage.setItem(SHOW_LABELS_KEY, enabled ? '1' : '0');
+    } catch {
+      // Storage may be unavailable (private mode) — the toggle still works.
+    }
+    set({ showLabels: enabled });
+  },
 
   quickCompare: async () => {
     const { scenes, selectScene, setCompareRight } = get();

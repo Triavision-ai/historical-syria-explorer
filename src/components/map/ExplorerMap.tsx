@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { MapCanvas } from './MapCanvas';
+import { PLACE_LABELS_LAYER_ID } from './basemapStyle';
 import { setSceneOverlay, setSceneOverlayOpacity } from './sceneOverlay';
 import { syncMaps } from './mapSync';
 import { useExplorerStore } from '@/hooks/useExplorerStore';
@@ -27,7 +28,17 @@ export function ExplorerMap() {
   const compareMode = useExplorerStore((state) => state.compareMode);
   const compareRightScene = useExplorerStore((state) => state.compareRightScene);
   const compareRightLayer = useExplorerStore((state) => state.compareRightLayer);
+  const showLabels = useExplorerStore((state) => state.showLabels);
   const comparing = compareMode && sceneLayer !== null;
+
+  // Toggle the place-name overlay on both map instances.
+  useEffect(() => {
+    for (const map of [mainMap, compareMap]) {
+      if (map?.getLayer(PLACE_LABELS_LAYER_ID)) {
+        map.setLayoutProperty(PLACE_LABELS_LAYER_ID, 'visibility', showLabels ? 'visible' : 'none');
+      }
+    }
+  }, [mainMap, compareMap, showLabels]);
 
   // Fly to a newly chosen location. Only a fly REQUEST may move the camera:
   // pan-follow writes the settled centre back into the store, and depending on
