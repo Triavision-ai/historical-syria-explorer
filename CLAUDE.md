@@ -44,6 +44,16 @@ the agreed backlog.
   find-digitized.yml (which frames near a point are downloadable),
   harvest-declass / harvest-maxar (catalogs), deploy.yml, secret-scan.yml.
 
+## State as of 2026-08-05
+
+- German-Syrian Research Foundation partnership DECIDED: the repository
+  stays in Triavision-ai (no fork, no transfer for now). The foundation
+  (github.com/German-Syrian-Research-Foundation) is credited as
+  supporter in the README, the welcome hint, and the permanent map
+  attribution line. Revisit a full transfer only if Ahmad gets org
+  owner status there; a custom domain first would make that move
+  painless (recommended to Ahmad).
+
 ## State as of 2026-08-01
 
 - Quality scoring DECIDED (ends the open question in DATA_PIPELINE §4):
