@@ -35,11 +35,7 @@ export function ExplorerMap() {
   useEffect(() => {
     for (const map of [mainMap, compareMap]) {
       if (map?.getLayer(PLACE_LABELS_LAYER_ID)) {
-        map.setLayoutProperty(
-          PLACE_LABELS_LAYER_ID,
-          'visibility',
-          showLabels ? 'visible' : 'none',
-        );
+        map.setLayoutProperty(PLACE_LABELS_LAYER_ID, 'visibility', showLabels ? 'visible' : 'none');
       }
     }
   }, [mainMap, compareMap, showLabels]);
