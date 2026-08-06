@@ -44,15 +44,32 @@ the agreed backlog.
   find-digitized.yml (which frames near a point are downloadable),
   harvest-declass / harvest-maxar (catalogs), deploy.yml, secret-scan.yml.
 
+## State as of 2026-08-06
+
+- Visitor analytics DECIDED and live: Cloudflare Web Analytics beacon
+  in index.html (cookie-free, aggregate only; token is public by
+  design). README has a Privacy section. Dashboard: Ahmad's Cloudflare
+  account → Web Analytics. GoatCounter was the runner-up (open source,
+  public-stats option) if Cloudflare ever disappoints.
+- Place names DECIDED: optional Esri reference-label overlay behind a
+  Names toggle (off by default, persisted, drawn above film overlays).
+  Agreed follow-up when Arabic UI work starts: switch the label layer
+  to OpenStreetMap for Arabic village names — Esri labels are
+  Latin-only.
+- GitHub Pages deploys can stick in deployment_queued and time out;
+  re-runs of the same commit then die instantly ("Deployment
+  cancelled") because the stuck deployment pins that SHA. Fix: push a
+  fresh commit (new SHA); force-cancel via API is the fallback.
+
 ## State as of 2026-08-05
 
 - German-Syrian Research Foundation partnership DECIDED: the repository
   stays in Triavision-ai (no fork, no transfer for now). The foundation
-  (github.com/German-Syrian-Research-Foundation) is credited as
-  supporter in the README, the welcome hint, and the permanent map
-  attribution line. Revisit a full transfer only if Ahmad gets org
-  owner status there; a custom domain first would make that move
-  painless (recommended to Ahmad).
+  is credited as supporter — linking to its website ds-fg.com (GitHub
+  org kept as a secondary link in the README) — in the README, the
+  welcome hint, and the permanent map attribution line. Revisit a full
+  transfer only if Ahmad gets org owner status there; a custom domain
+  first would make that move painless (recommended to Ahmad).
 
 ## State as of 2026-08-01
 
