@@ -56,10 +56,17 @@ the agreed backlog.
   Agreed follow-up when Arabic UI work starts: switch the label layer
   to OpenStreetMap for Arabic village names — Esri labels are
   Latin-only.
-- GitHub Pages deploys can stick in deployment_queued and time out;
-  re-runs of the same commit then die instantly ("Deployment
-  cancelled") because the stuck deployment pins that SHA. Fix: push a
-  fresh commit (new SHA); force-cancel via API is the fallback.
+- GitHub Pages deploys can stick in deployment_queued and time out.
+  Worse: a SHA whose Pages deployment was EVER cancelled is poisoned —
+  every later deployment of that same SHA reports "Deployment
+  cancelled" within seconds, because deploy-pages polls status by
+  build version and reads the old cancelled record. Recovery recipe
+  (worked 2026-08-06): (1) if blocked by "cancel <sha> first", run
+  pages-maintenance.yml with that SHA; (2) land a brand-new commit
+  and let ONLY the automatic push-triggered deploy run — never
+  dispatch manually while a push run is live (concurrency
+  cancel-in-progress kills one mid-deployment and poisons the SHA),
+  and never re-run a failed deploy job.
 
 ## State as of 2026-08-05
 
