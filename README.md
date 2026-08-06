@@ -16,6 +16,10 @@ This is an educational, non-commercial project under active development. It is a
 
 This project is supported by the [German-Syrian Research Foundation](https://ds-fg.com) ([GitHub](https://github.com/German-Syrian-Research-Foundation)). The application remains free, open source, and non-commercial.
 
+## Privacy
+
+There are no accounts, no ads, and no individual tracking. The site uses Cloudflare Web Analytics, a cookie-free counter that records only aggregate visit numbers (visits per day, country, browser type) and collects no personal data.
+
 ## What it does today
 
 - Explore like a map: pan and zoom anywhere in Syria, or search for a city, town, or village in Arabic or English, or by coordinates.
