@@ -1,0 +1,31 @@
+name: Pages maintenance
+
+# Cancels a GitHub Pages deployment stuck "in progress" on GitHub's side.
+# Symptom (seen 2026-08-06): every deploy fails with "Deployment request
+# failed ... due to in progress deployment. Please cancel <sha> first or
+# wait for it to complete." Run this with that SHA, then re-run deploy.
+
+on:
+  workflow_dispatch:
+    inputs:
+      deployment_id:
+        description: 'Stuck Pages deployment ID (the commit SHA from the deploy error)'
+        required: true
+        type: string
+
+permissions:
+  pages: write
+
+jobs:
+  cancel:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cancel stuck Pages deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Env indirection, not inline interpolation: workflow inputs are
+          # untrusted (see the 2026-07-30 injection audit).
+          DEPLOYMENT_ID: ${{ inputs.deployment_id }}
+        run: |
+          gh api -X POST "/repos/${GITHUB_REPOSITORY}/pages/deployments/${DEPLOYMENT_ID}/cancel"
+          echo "Cancel request sent for ${DEPLOYMENT_ID}"
