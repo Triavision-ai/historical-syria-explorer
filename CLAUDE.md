@@ -44,6 +44,24 @@ the agreed backlog.
   find-digitized.yml (which frames near a point are downloadable),
   harvest-declass / harvest-maxar (catalogs), deploy.yml, secret-scan.yml.
 
+## State as of 2026-08-10
+
+- Custom domain DECIDED and bought by Ahmad: syria-explorer.com
+  (Cloudflare Registrar, same account as R2). DNS: three A records to
+  GitHub Pages IPs + www CNAME, all DNS-only; custom domain set in
+  repo Settings → Pages. Vite base is now './' (relative) so one build
+  serves both the domain root and the legacy github.io path — beware
+  string-concatenating origin+BASE_URL (tilesManifest resolves via
+  new URL against the page instead). syriaexplorer.com (no hyphen) is
+  an unrelated commercial travel agency — never link it.
+- Web Analytics is registered for hostname triavision-ai.github.io;
+  Ahmad must add syria-explorer.com in Cloudflare Web Analytics after
+  the switch so counting continues under the new name.
+- KH-7 funding proposal for DSFG drafted (two-page docx, delivered in
+  chat 2026-08-10): team of Syrians (GIS specialist + 1-2
+  programmers), 2-3 workstations, EUR 30-47k indicative, 12 months,
+  website deliberately stays the simple proof-of-concept window.
+
 ## State as of 2026-08-06
 
 - Visitor analytics DECIDED and live: Cloudflare Web Analytics beacon

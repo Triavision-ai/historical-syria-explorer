@@ -30,7 +30,7 @@ together; each can be inspected independently:
 |---|---|---|
 | Brain: code, pipelines, small data | GitHub repository | github.com/Triavision-ai/historical-syria-explorer |
 | Warehouse: heavy imagery (tile pyramids) | Cloudflare R2 bucket `syria-tiles` | dash.cloudflare.com → R2 |
-| Storefront: the public website | GitHub Pages | triavision-ai.github.io/historical-syria-explorer |
+| Storefront: the public website | GitHub Pages | syria-explorer.com (custom domain; the legacy triavision-ai.github.io/historical-syria-explorer path redirects) |
 
 Everything heavy or automated runs as **GitHub Actions workflows** — recipe
 files in `.github/workflows/`. A workflow borrows a temporary Linux machine
