@@ -9,15 +9,15 @@ Browse images are the USGS quicklook of the WHOLE scanned film segment,
 which is exactly what the tile pyramid is cut from - open one to see
 what a scene really contains before aligning it.
 
-| Entity ID | Area | Date | Mission | Native res | Alignment |
-|---|---|---|---|---|---|
-| DZB00402700090H020001 | Hama | 1966-04-25 | KH-7 | 0.6 m | human-verified for the Hama panel only - multi-frame scan, see below |
-| DZB1206-500074L008001 | Aleppo | 1973-08-01 | KH-9 | 0.6 m | archive corners, pending |
-| DZB1206-500016L011001 | Latakia | 1973-07-18 | KH-9 | 0.6 m | archive corners, pending |
-| DZB1205-500082L008001 | Deir ez-Zor | 1973-03-28 | KH-9 | 0.6 m | archive corners, pending |
-| DZB1210-500023L001001 | Idlib | 1975-06-13 | KH-9 | 0.6 m | archive corners, pending |
-| DZB1210-500184L001001 | Homs / Damascus | 1975-07-24 | KH-9 | 0.6 m | archive corners, pending |
-| D3C1209-400566A011 | Raqqa | 1975-01-25 | KH-9 mapping | 6 m | archive corners, pending |
+| Entity ID             | Area            | Date       | Mission      | Native res | Alignment                                                            |
+| --------------------- | --------------- | ---------- | ------------ | ---------- | -------------------------------------------------------------------- |
+| DZB00402700090H020001 | Hama            | 1966-04-25 | KH-7         | 0.6 m      | human-verified for the Hama panel only - multi-frame scan, see below |
+| DZB1206-500074L008001 | Aleppo          | 1973-08-01 | KH-9         | 0.6 m      | archive corners, pending                                             |
+| DZB1206-500016L011001 | Latakia         | 1973-07-18 | KH-9         | 0.6 m      | archive corners, pending                                             |
+| DZB1205-500082L008001 | Deir ez-Zor     | 1973-03-28 | KH-9         | 0.6 m      | archive corners, pending                                             |
+| DZB1210-500023L001001 | Idlib           | 1975-06-13 | KH-9         | 0.6 m      | archive corners, pending                                             |
+| DZB1210-500184L001001 | Homs / Damascus | 1975-07-24 | KH-9         | 0.6 m      | archive corners, pending                                             |
+| D3C1209-400566A011    | Raqqa           | 1975-01-25 | KH-9 mapping | 6 m        | archive corners, pending                                             |
 
 Note: the catalog labels the `declassii` dataset "KH-7 GAMBIT / KH-9
 HEXAGON" as a single string; the per-scene mission above follows the
@@ -49,15 +49,15 @@ lengths, diagonals) and testing whether its target city falls inside
 that quad. Inputs: public/tiles/corners.json and
 public/catalog/places.json - reproducible offline, no network.
 
-| Scene | Footprint | Shape | Target city |
-|---|---|---|---|
-| DZB00402700090H020001 (Hama, hand-aligned) | 20.5 x 53.0 km | near-rectangular, diagonals 57.3 / 57.1 | Hama inside |
-| DZB1206-500074L008001 (Aleppo) | 118.6 x 237.2 km | exact parallelogram, aspect 0.500 | Aleppo inside |
-| DZB1206-500016L011001 (Latakia) | 117.8 x 235.6 km | exact parallelogram, aspect 0.500 | Latakia inside |
-| DZB1205-500082L008001 (Deir ez-Zor) | 115.9 x 232.0 km | exact parallelogram, aspect 0.499 | Deir ez-Zor inside |
-| DZB1210-500023L001001 (Idlib) | 119.4 x 239.3 km | exact parallelogram, aspect 0.499 | Idlib OUTSIDE, ~4 km north of the edge |
-| DZB1210-500184L001001 (Homs/Damascus) | 118.9 x 238.2 km | exact parallelogram, aspect 0.499 | Homs OUTSIDE, ~3 km east of the edge |
-| D3C1209-400566A011 (Raqqa) | 303 km long, sides 16.8 vs 36.9 km | INVALID: not a parallelogram, diagonals 292.8 / 304.3 | Raqqa OUTSIDE |
+| Scene                                      | Footprint                          | Shape                                                 | Target city                            |
+| ------------------------------------------ | ---------------------------------- | ----------------------------------------------------- | -------------------------------------- |
+| DZB00402700090H020001 (Hama, hand-aligned) | 20.5 x 53.0 km                     | near-rectangular, diagonals 57.3 / 57.1               | Hama inside                            |
+| DZB1206-500074L008001 (Aleppo)             | 118.6 x 237.2 km                   | exact parallelogram, aspect 0.500                     | Aleppo inside                          |
+| DZB1206-500016L011001 (Latakia)            | 117.8 x 235.6 km                   | exact parallelogram, aspect 0.500                     | Latakia inside                         |
+| DZB1205-500082L008001 (Deir ez-Zor)        | 115.9 x 232.0 km                   | exact parallelogram, aspect 0.499                     | Deir ez-Zor inside                     |
+| DZB1210-500023L001001 (Idlib)              | 119.4 x 239.3 km                   | exact parallelogram, aspect 0.499                     | Idlib OUTSIDE, ~4 km north of the edge |
+| DZB1210-500184L001001 (Homs/Damascus)      | 118.9 x 238.2 km                   | exact parallelogram, aspect 0.499                     | Homs OUTSIDE, ~3 km east of the edge   |
+| D3C1209-400566A011 (Raqqa)                 | 303 km long, sides 16.8 vs 36.9 km | INVALID: not a parallelogram, diagonals 292.8 / 304.3 | Raqqa OUTSIDE                          |
 
 Findings:
 
