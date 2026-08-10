@@ -2,7 +2,7 @@
 
 An open-source web platform for exploring the satellite imagery record of Syria, from declassified reconnaissance film of the 1960s to current high-resolution imagery.
 
-Live application: https://triavision-ai.github.io/historical-syria-explorer/
+Live application: https://syria-explorer.com (the previous address, https://triavision-ai.github.io/historical-syria-explorer/, redirects here)
 
 ## Purpose
 

@@ -37,5 +37,9 @@ export function tileUrlTemplate(entityId: string, entry: TiledSceneEntry): strin
   if (entry.storage === 'r2') {
     return `${ENDPOINTS.tilesBase}/tiles/${entityId}/{z}/{x}/{y}.png`;
   }
-  return `${window.location.origin}${import.meta.env.BASE_URL}tiles/${entityId}/{z}/{x}/{y}.png`;
+  // BASE_URL is relative ('./'); resolve it against the page URL first —
+  // origin + './' would produce a malformed host. The {z}/{x}/{y} part is
+  // appended afterwards so it never goes through URL encoding.
+  const base = new URL(import.meta.env.BASE_URL, window.location.href).href;
+  return `${base}tiles/${entityId}/{z}/{x}/{y}.png`;
 }

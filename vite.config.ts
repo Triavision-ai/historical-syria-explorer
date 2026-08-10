@@ -5,11 +5,14 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
 /**
- * `base` must match the GitHub Pages project path:
- * https://triavision-ai.github.io/historical-syria-explorer/
+ * Relative base: the app serves from BOTH the custom domain root
+ * (https://syria-explorer.com/) and the legacy GitHub Pages path
+ * (https://triavision-ai.github.io/historical-syria-explorer/), so every
+ * built asset URL must be relative to the page rather than pinned to
+ * either prefix.
  */
 export default defineConfig({
-  base: '/historical-syria-explorer/',
+  base: './',
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
