@@ -43,11 +43,9 @@ export function MapCanvas({
       zoom: initialZoom,
       minZoom: MAP_CONFIG.minZoom,
       maxZoom: MAP_CONFIG.maxZoom,
-      attributionControl: {
-        compact: true,
-        customAttribution:
-          'Supported by the <a href="https://ds-fg.com" target="_blank" rel="noopener noreferrer">German-Syrian Research Foundation</a>',
-      },
+      // Added manually below so it sits top-right under the zoom buttons
+      // instead of fighting the timeline footer for the bottom corner.
+      attributionControl: false,
     });
     map.touchZoomRotate.enable();
     // Surface tile/texture load failures (e.g. CORS-blocked overlay images)
@@ -56,6 +54,14 @@ export function MapCanvas({
     if (withNavControl) {
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
     }
+    map.addControl(
+      new maplibregl.AttributionControl({
+        compact: true,
+        customAttribution:
+          'Supported by the <a href="https://ds-fg.com" target="_blank" rel="noopener noreferrer">German-Syrian Research Foundation</a>',
+      }),
+      'top-right',
+    );
 
     map.once('load', () => callbacksRef.current.onMapReady(map));
 

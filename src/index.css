@@ -38,11 +38,9 @@ body,
   color: #9ca3af !important;
   font-size: 10px;
 }
-/* Park the credits above the bottom controls (the footer publishes its own
-   height) instead of over the timeline, and keep them above the footer's
-   z-30 so the expanded text is never clipped. */
-.maplibregl-ctrl-bottom-right {
-  bottom: var(--map-footer-h, 0px);
+/* Credits live top-right under the zoom buttons; keep them above the
+   header's z-30 so the expanded text is never clipped. */
+.maplibregl-ctrl-top-right {
   z-index: 35;
 }
 .maplibregl-ctrl-attrib.maplibregl-compact-show .maplibregl-ctrl-attrib-inner {
@@ -50,10 +48,14 @@ body,
   white-space: normal;
 }
 
-/* Zoom buttons are a desktop nicety: on a phone they collide with the
-   stacked header, and pinch-zoom already covers the need. */
+/* Phones: the stacked header owns the top edge, so start the control stack
+   below it (the header publishes its height), and hide the zoom buttons —
+   they collide with the header and pinch-zoom already covers the need. */
 @media (max-width: 639px) {
   .maplibregl-ctrl-top-right {
+    margin-top: var(--map-header-h, 7rem);
+  }
+  .maplibregl-ctrl-top-right .maplibregl-ctrl-group {
     display: none;
   }
 }

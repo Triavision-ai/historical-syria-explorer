@@ -21,19 +21,25 @@ export function HomePage() {
   const scenes = useExplorerStore((state) => state.scenes);
   const searchStatus = useExplorerStore((state) => state.searchStatus);
   const footerRef = useRef<HTMLElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
 
-  // Publish the bottom controls' height so map credits can sit above them.
-  // The footer grows and shrinks (loading pill, compare buttons, timeline
-  // wrap), and on a phone a fixed offset would leave the expanded
-  // attribution covering the whole timeline.
+  // Publish the header's and footer's heights: the scene-overlay
+  // attribution sits above the footer, and on phones the map credits
+  // start below the stacked header. Both bars grow and shrink (loading
+  // pill, compare buttons, wrapping), so fixed offsets would drift.
   useLayoutEffect(() => {
-    const footer = footerRef.current;
-    if (!footer) return;
-    const publish = () =>
-      document.documentElement.style.setProperty('--map-footer-h', `${footer.offsetHeight}px`);
-    publish();
-    const observer = new ResizeObserver(publish);
-    observer.observe(footer);
+    const bars = [
+      [headerRef.current, '--map-header-h'],
+      [footerRef.current, '--map-footer-h'],
+    ] as const;
+    const observer = new ResizeObserver(() => {
+      for (const [el, cssVar] of bars) {
+        if (el) document.documentElement.style.setProperty(cssVar, `${el.offsetHeight}px`);
+      }
+    });
+    for (const [el] of bars) {
+      if (el) observer.observe(el);
+    }
     return () => observer.disconnect();
   }, []);
 
@@ -49,7 +55,10 @@ export function HomePage() {
       <ExplorerMap />
 
       {/* Top bar */}
-      <header className="pointer-events-none absolute inset-x-0 top-0 z-30 flex flex-col gap-2 p-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:flex-row sm:items-center">
+      <header
+        ref={headerRef}
+        className="pointer-events-none absolute inset-x-0 top-0 z-30 flex flex-col gap-2 p-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:flex-row sm:items-center"
+      >
         <h1 className="pointer-events-auto shrink-0 rounded-xl border border-surface-600 bg-surface-900/90 px-3 py-2 text-sm font-bold tracking-tight text-gray-100 shadow-lg backdrop-blur">
           <span className="text-accent-400">Syria</span> Explorer
           <span className="ml-2 hidden text-[10px] font-medium text-gray-500 sm:inline">
