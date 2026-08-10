@@ -38,42 +38,42 @@ always the live state.
 
 ## Category 1 — Already georeferenced: ingest directly
 
-| # | Source | Era | Resolution | License | Next action | Status |
-|---|--------|-----|-----------|---------|-------------|--------|
-| 1.1 | CORONA Atlas (A/1) | 1967–1972 | 1.8–2.7 m | CC BY-SA 4.0 footer vs "non-commercial" prose — email CAST | COVERAGE MAPPED (runs 3–4, 2026-08-02): 41/44 places confirmed with layer IDs in public/catalog/corona-atlas-coverage.json, incl. Damascus (1101-2168df029); still unfound after 80 attempts: tadmur, palmyra-site, zabadani (not proof of absence). Next: Ahmad eyeballs Hama sample vs the KH-7 reference; email CAST about re-hosting; then build CORONA ingestion (GeoTIFF/WMTS → tiles → R2) | in-progress |
-| 1.2 | Copernicus DEM GLO-30 (B11) | current | 30 m terrain | open, attribution | Hillshade layer under film scenes | todo |
-| 1.3 | HOT OSM Syria extracts (B12) | current | vector | ODbL | Arabic place names for UI; reference vectors | todo |
-| 1.4 | UNOSAT damage vectors (B9) | 2013–2023 | building-level vector | free w/ attribution | Download per-city sets from HDX; hold for timeline UI | todo |
-| 1.5 | EAMENA Zenodo GeoJSON (A/4) | current | site points | CC BY 4.0 | Fetch published Syria datasets only (no coordinate re-publishing beyond them) | todo |
+| #   | Source                       | Era       | Resolution            | License                                                    | Next action                                                                                                                                                                                                                                                                                                                                                                                       | Status      |
+| --- | ---------------------------- | --------- | --------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| 1.1 | CORONA Atlas (A/1)           | 1967–1972 | 1.8–2.7 m             | CC BY-SA 4.0 footer vs "non-commercial" prose — email CAST | COVERAGE MAPPED (runs 3–4, 2026-08-02): 41/44 places confirmed with layer IDs in public/catalog/corona-atlas-coverage.json, incl. Damascus (1101-2168df029); still unfound after 80 attempts: tadmur, palmyra-site, zabadani (not proof of absence). Next: Ahmad eyeballs Hama sample vs the KH-7 reference; email CAST about re-hosting; then build CORONA ingestion (GeoTIFF/WMTS → tiles → R2) | in-progress |
+| 1.2 | Copernicus DEM GLO-30 (B11)  | current   | 30 m terrain          | open, attribution                                          | Hillshade layer under film scenes                                                                                                                                                                                                                                                                                                                                                                 | todo        |
+| 1.3 | HOT OSM Syria extracts (B12) | current   | vector                | ODbL                                                       | Arabic place names for UI; reference vectors                                                                                                                                                                                                                                                                                                                                                      | todo        |
+| 1.4 | UNOSAT damage vectors (B9)   | 2013–2023 | building-level vector | free w/ attribution                                        | Download per-city sets from HDX; hold for timeline UI                                                                                                                                                                                                                                                                                                                                             | todo        |
+| 1.5 | EAMENA Zenodo GeoJSON (A/4)  | current   | site points           | CC BY 4.0                                                  | Fetch published Syria datasets only (no coordinate re-publishing beyond them)                                                                                                                                                                                                                                                                                                                     | todo        |
 
 ## Category 2 — Easy alignment: scanned maps with printed grids
 
-| # | Source | Era | Scale | License | Next action | Status |
-|---|--------|-----|-------|---------|-------------|--------|
-| 2.1 | AMS K922 Damascus + Aleppo city plans (B2) | 1958 | 1:10,000 | public domain | Locate LOC item URLs (browser needed), download, georeference by grid | todo |
-| 2.2 | Levant 1:50,000 Mandate series (B3) | 1927–1945 | 1:50,000 | pre-1946 French military; check per-item | Inspect Nakala datasets + LOC holdings; list sheets covering our cities | todo |
-| 2.3 | AMS K502 sheets at ANU (B4) | 1950s | 1:250,000 | out of copyright | Download Syria sheets from ANU repository | todo |
-| 2.4 | AMS K521/K421 at UT Austin (B4) | 1941–42 | 1:200k/1:500k | public domain | Download from PCL pages | todo |
-| 2.5 | Gallica Mandate-era maps (B5) | 1930s | small/medium | BnF non-commercial | Pull via IIIF as context layers | todo |
+| #   | Source                                     | Era       | Scale         | License                                  | Next action                                                             | Status |
+| --- | ------------------------------------------ | --------- | ------------- | ---------------------------------------- | ----------------------------------------------------------------------- | ------ |
+| 2.1 | AMS K922 Damascus + Aleppo city plans (B2) | 1958      | 1:10,000      | public domain                            | Locate LOC item URLs (browser needed), download, georeference by grid   | todo   |
+| 2.2 | Levant 1:50,000 Mandate series (B3)        | 1927–1945 | 1:50,000      | pre-1946 French military; check per-item | Inspect Nakala datasets + LOC holdings; list sheets covering our cities | todo   |
+| 2.3 | AMS K502 sheets at ANU (B4)                | 1950s     | 1:250,000     | out of copyright                         | Download Syria sheets from ANU repository                               | todo   |
+| 2.4 | AMS K521/K421 at UT Austin (B4)            | 1941–42   | 1:200k/1:500k | public domain                            | Download from PCL pages                                                 | todo   |
+| 2.5 | Gallica Mandate-era maps (B5)              | 1930s     | small/medium  | BnF non-commercial                       | Pull via IIIF as context layers                                         | todo   |
 
 ## Category 3 — Standard film pipeline: scan/stitch/align by eye
 
-| # | Source | Era | Resolution | License | Next action | Status |
-|---|--------|-----|-----------|---------|-------------|--------|
-| 3.1 | KH-9 panoramic, Declass-3 (B1) | 1971–1984 | sub-metre? VERIFY | public domain | EarthExplorer: check Damascus/Aleppo coverage + real GSD BEFORE any KH-7 scan order | todo |
-| 3.2 | U-2 frames (A/6) | 1958–1960 | ~0.5 m | public domain | Download Hammer & Ur index, intersect with city list, cost a NARA scan order; study Brown u2egypt code | todo |
-| 3.3 | SPOT SWH scenes (A/2) | 1986–2015 | 2.5–20 m | Etalab 2.0 (verify at download) | Register, inventory Syria via OpenSearch API; prefer waiting for ortho L2 | todo |
-| 3.4 | NCAP Project ROBIN + Syria holdings (B6) | 1956 | aerial | NCAP/HES, paid scans | Browse Syria page, get scan quote for coastal cities | todo |
+| #   | Source                                   | Era       | Resolution        | License                         | Next action                                                                                            | Status |
+| --- | ---------------------------------------- | --------- | ----------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------ | ------ |
+| 3.1 | KH-9 panoramic, Declass-3 (B1)           | 1971–1984 | sub-metre? VERIFY | public domain                   | EarthExplorer: check Damascus/Aleppo coverage + real GSD BEFORE any KH-7 scan order                    | todo   |
+| 3.2 | U-2 frames (A/6)                         | 1958–1960 | ~0.5 m            | public domain                   | Download Hammer & Ur index, intersect with city list, cost a NARA scan order; study Brown u2egypt code | todo   |
+| 3.3 | SPOT SWH scenes (A/2)                    | 1986–2015 | 2.5–20 m          | Etalab 2.0 (verify at download) | Register, inventory Syria via OpenSearch API; prefer waiting for ortho L2                              | todo   |
+| 3.4 | NCAP Project ROBIN + Syria holdings (B6) | 1956      | aerial            | NCAP/HES, paid scans            | Browse Syria page, get scan quote for coastal cities                                                   | todo   |
 
 ## Category 4 — Blocked or watch
 
-| # | Source | Blocker | Status |
-|---|--------|---------|--------|
-| 4.1 | SPOT ortho Level 2 (Magellium) | not yet released for our area — watch | blocked |
-| 4.2 | Soviet Genshtab topo maps (B8) | unresolved copyright — reference only, no re-hosting | blocked |
-| 4.3 | Luftwaffe GX over Syria (B7) | existence for Syria unproven — needs NARA RG 373 finding-aid check | blocked |
-| 4.4 | UNESCO WHS data (B13) | restrictive terms — use OSM/Wikidata coordinates instead, or request permission | blocked |
-| 4.5 | Bavarian WWI Damascus frames (A/8) | needs archive enquiry via foundation | blocked |
+| #   | Source                             | Blocker                                                                         | Status  |
+| --- | ---------------------------------- | ------------------------------------------------------------------------------- | ------- |
+| 4.1 | SPOT ortho Level 2 (Magellium)     | not yet released for our area — watch                                           | blocked |
+| 4.2 | Soviet Genshtab topo maps (B8)     | unresolved copyright — reference only, no re-hosting                            | blocked |
+| 4.3 | Luftwaffe GX over Syria (B7)       | existence for Syria unproven — needs NARA RG 373 finding-aid check              | blocked |
+| 4.4 | UNESCO WHS data (B13)              | restrictive terms — use OSM/Wikidata coordinates instead, or request permission | blocked |
+| 4.5 | Bavarian WWI Damascus frames (A/8) | needs archive enquiry via foundation                                            | blocked |
 
 ## Category 5 — Context only (oblique/ground; deferred by scope decision)
 
@@ -91,6 +91,7 @@ Soviet film imagery brokers.
 # Part A — Original entries, now verified
 
 ## 1. CORONA Atlas of the Middle East — University of Arkansas CAST
+
 Reliability: mostly-solid. Syria is the Atlas's best-covered country.
 
 - Corroborated: orthorectified, georeferenced CORONA imagery; free
@@ -127,6 +128,7 @@ Reliability: mostly-solid. Syria is the Atlas's best-covered country.
   identified on the imagery.
 
 ## 2. SPOT World Heritage archive — CNES (France)
+
 Reliability: mostly-solid. Likely the densest FREE post-1986 archive
 for Syria (>17 million scenes worldwide, 1986–2015, 60×60 km each).
 
@@ -153,6 +155,7 @@ for Syria (>17 million scenes worldwide, 1986–2015, 60×60 km each).
   sandbox) — inventory via the portal/API from outside.
 
 ## 3. Syrian Heritage Archive (SHAP) — Museum für Islamische Kunst + DAI Berlin
+
 Reliability: mostly-solid. DEFERRED (mostly ground photos), with a
 geographic exception worth keeping in view.
 
@@ -175,6 +178,7 @@ geographic exception worth keeping in view.
   data exists in this sphere even if not yet published as open rasters.
 
 ## 4. EAMENA — Endangered Archaeology in the Middle East and North Africa
+
 Reliability: solid. In scope as a heritage-sites overlay, with an
 ethical caveat.
 
@@ -202,6 +206,7 @@ ethical caveat.
     City of Aleppo WHS (state as of Dec 2016).
 
 ## 5. APAAME aerial photographic archive
+
 Reliability: mostly-solid. Effectively OUT of scope for Syria imagery —
 corrected downward.
 
@@ -217,6 +222,7 @@ corrected downward.
   Hunting Aerial Survey of JORDAN diapositives (~4,000, not online).
 
 ## 6. Declassified U-2 aerial photography (1958–1960)
+
 Reliability: mostly-solid — and one claim CONTRADICTED in our favor.
 This upgrade makes U-2 far more actionable than first recorded.
 
@@ -247,6 +253,7 @@ This upgrade makes U-2 far more actionable than first recorded.
   archival expedition.
 
 ## 7. French Mandate aerial photography (Poidebard) and the Ifpo collection
+
 Reliability: mostly-solid, with corrections.
 
 - Corrections found:
@@ -272,6 +279,7 @@ Reliability: mostly-solid, with corrections.
   systematic vertical mapping — per-site "then" layer, not a base map.
 
 ## 8. WWI German aerial photography — Bavarian Fliegerabteilung 304
+
 Reliability: mostly-solid. Confirmed marginal for Syria — with one
 concrete exception.
 
@@ -293,7 +301,8 @@ concrete exception.
 
 # Part B — New finds from the expansion research (geographic, in scope)
 
-## B1. KH-9 HEXAGON panoramic-camera imagery — USGS Declass-3  [HIGH]
+## B1. KH-9 HEXAGON panoramic-camera imagery — USGS Declass-3 [HIGH]
+
 The 2011 declassification tranche (~670,000+ scenes at USGS EROS,
 digitized copies flowing into EarthExplorer since 2015/2020) includes
 the KH-9 PANORAMIC camera — reported sub-metre-class GSD, i.e.
@@ -308,7 +317,8 @@ changing any plan. Public domain.
 Evidence: usgs.gov/centers/eros/science/usgs-eros-archive-declassified-data-declassified-satellite-imagery-3;
 researchgate.net/publication/308684304.
 
-## B2. US Army Map Service K922 city plans: Damascus & Aleppo 1:10,000 (1958)  [MEDIUM]
+## B2. US Army Map Service K922 city plans: Damascus & Aleppo 1:10,000 (1958) [MEDIUM]
+
 Street-level city plans of Damascus and Aleppo, Edition 2-AMS (1958),
 compiled from British "Town Plans of Syria and Lebanon" (1951). Exactly
 the pre-expansion era of our film; US government works = public domain;
@@ -316,7 +326,8 @@ scans at the Library of Congress (downloadable TIFF/JPEG2000). LOC 403s
 from the sandbox — pull item URLs from a browser:
 loc.gov/maps/ (contributor: United States. Army Map Service, location: Syria).
 
-## B3. French Mandate "Levant 1:50,000" topographic series (1927–1945)  [MEDIUM]
+## B3. French Mandate "Levant 1:50,000" topographic series (1927–1945) [MEDIUM]
+
 The core Mandate-era topographic series of Syria/Lebanon, 80+ sheets
 (Bureau Topographique des Troupes du Levant). Highest-value historical
 MAP layer for our cities. Digitized sheets at the Library of Congress
@@ -326,16 +337,18 @@ CNRS repository: https://nakala.fr/10.34847/nkl.ccadlmu2 and
 https://nakala.fr/10.34847/nkl.ac8b9ar8 (sheet lists and licenses
 unverified: 403 from sandbox; inspect from a browser).
 
-## B4. AMS small/medium-scale series, openly scanned  [HIGH for access]
+## B4. AMS small/medium-scale series, openly scanned [HIGH for access]
+
 - Series K502 1:250,000 (1950s): individually scanned, out-of-copyright
   Syria sheets in the ANU Open Research Repository (open, no login,
   full-res downloads) — confirmed sheets incl. El Bab NJ 37-14 (1958),
-  Soueida.  https://openresearch-repository.anu.edu.au (search "Syria K502")
+  Soueida. https://openresearch-repository.anu.edu.au (search "Syria K502")
 - Series K521 Syria 1:200,000 (1941+) and K421 Levant 1:500,000 (1942):
   Perry-Castañeda Library, UT Austin —
   maps.lib.utexas.edu/maps/ams/syria_200k/ (public domain).
 
-## B5. BnF Gallica: Armée du Levant aerial photos + Mandate maps  [HIGH]
+## B5. BnF Gallica: Armée du Levant aerial photos + Mandate maps [HIGH]
+
 The Bibliothèque nationale de France has digitized French-Mandate
 MILITARY AERIAL photography of Syria: curated set "Armée du Levant :
 Photos aériennes de Syrie et Liban" on the Patrimoines Partagés portal
@@ -347,7 +360,8 @@ ark:/12148/btv1b531728670, Dubertret geological maps). Free
 non-commercial reuse with attribution per BnF conditions; high-res via
 IIIF.
 
-## B6. NCAP — National Collection of Aerial Photography, Edinburgh  [HIGH]
+## B6. NCAP — National Collection of Aerial Photography, Edinburgh [HIGH]
+
 ~30 million images, 103 countries, with an explicit Syria browse page:
 https://ncap.org.uk/browse/countries/syria — confirmed Syria content
 includes the declassified UK "Project ROBIN" 1956 high-altitude sorties
@@ -355,7 +369,8 @@ includes the declassified UK "Project ROBIN" 1956 high-altitude sorties
 screen resolution; high-res scans are PAID on-demand digitisation; NCAP/
 HES license (not open). Search tool: airphotofinder.ncap.org.
 
-## B7. Luftwaffe WWII "GX" reconnaissance (NARA RG 373 + NCAP)  [MEDIUM, unproven]
+## B7. Luftwaffe WWII "GX" reconnaissance (NARA RG 373 + NCAP) [MEDIUM, unproven]
+
 1.2M+ captured German frames at NARA ("German Flown Aerial Photography
 1939–1945", RG 373); "Middle East 1941–44" coverage confirmed in
 general, Luftwaffe operated over Syria in 1941 (Vichy period, Aleppo
@@ -363,7 +378,8 @@ staging) — but no source examined names Damascus/Aleppo sorties.
 Public domain once copied; free self-service scanning on site.
 archives.gov/research/cartographic/aerial-photography/foreign-photography
 
-## B8. Soviet General Staff (Genshtab) topographic maps of Syria  [MEDIUM]
+## B8. Soviet General Staff (Genshtab) topographic maps of Syria [MEDIUM]
+
 Complete Soviet military topo coverage: 1:200,000 full-country
 (1970s–80s; long considered the best complete map cover of Syria) and
 1:100,000 (~148 sheets, 1963–1991). Matches our film eras; rich contour/
@@ -373,7 +389,8 @@ formally released). Commercial licensed source: East View
 (geamap.com/en/soviet) but with no clean license for re-hosting. Record,
 use for reference, do not re-host without legal clarity.
 
-## B9. UNOSAT/UNITAR damage assessments on HDX  [HIGH]
+## B9. UNOSAT/UNITAR damage assessments on HDX [HIGH]
+
 Building-level and damage-density vector layers for exactly our cities
 (Homs, Aleppo, Hama, Deir ez-Zor, Raqqa, Daraa, Idlib, Damascus…),
 derived from VHR satellite imagery, free on the Humanitarian Data
@@ -381,25 +398,29 @@ Exchange (data.humdata.org; org "UNOSAT"). Shapefile/geodatabase.
 Pairs naturally with a then/now timeline. (Check per-dataset licenses —
 generally free with attribution.)
 
-## B10. Copernicus EMS activation EMSN096 — Syria urban damage & reconstruction  [MEDIUM]
+## B10. Copernicus EMS activation EMSN096 — Syria urban damage & reconstruction [MEDIUM]
+
 Building-by-building damage assessment (T0) and reconstruction
 monitoring (T0–T1) for Syrian urban areas (EU Delegation / UN-Habitat
 request). Free with attribution to Copernicus EMS.
 mapping.emergency.copernicus.eu/activations/EMSN096/
 
-## B11. Copernicus DEM GLO-30  [HIGH]
+## B11. Copernicus DEM GLO-30 [HIGH]
+
 Global 30 m DSM, full Syria coverage, free incl. commercial use with
 ESA/Airbus attribution; cloud-optimized GeoTIFFs on AWS Open Data
 (registry.opendata.aws/copernicus-dem/) and OpenTopography. Use for
 terrain-context hillshade under historical film.
 
-## B12. HOT OpenStreetMap Syria exports on HDX  [HIGH]
+## B12. HOT OpenStreetMap Syria exports on HDX [HIGH]
+
 Country-wide OSM extracts, GIS-ready and regularly refreshed: buildings
 (~1.2 M), roads (~173k km), waterways, POIs — incl. Arabic place names
 (useful for the Arabic UI work). ODbL 1.0 (attribution + share-alike on
 derived DATABASES). data.humdata.org/dataset/hotosm_syr_buildings etc.
 
-## B13. UNESCO World Heritage sites of Syria — LICENSE CAUTION  [HIGH relevance, restrictive terms]
+## B13. UNESCO World Heritage sites of Syria — LICENSE CAUTION [HIGH relevance, restrictive terms]
+
 Syria's 6 WHS (Damascus, Bosra, Palmyra, Aleppo, Crac des Chevaliers &
 Qal'at Salah El-Din, Ancient Villages of Northern Syria — all "in
 danger") are obvious map anchors, BUT whc.unesco.org's own terms
