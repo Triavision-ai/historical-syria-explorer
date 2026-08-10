@@ -108,11 +108,12 @@ export function HomePage() {
         ref={footerRef}
         className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex flex-col items-center gap-2 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
       >
-        {/* Panel toggle (when closed). Part of the footer stack rather than
-            free-floating, so its height is included in --map-footer-h and the
-            map credits park above it instead of covering it. */}
-        {activePanel === null && (
-          <div className="flex w-full max-w-3xl justify-end">
+        <div className="pointer-events-none flex items-center gap-2">
+          <ViewControls />
+          <LabelsToggle />
+          {/* Panel toggle (when closed) lives in the same row as Names, not
+              floating on its own. */}
+          {activePanel === null && (
             <button
               type="button"
               onClick={() => setActivePanel('scenes')}
@@ -120,12 +121,7 @@ export function HomePage() {
             >
               {searchStatus === 'loading' ? 'Searching…' : `Scenes (${scenes.length})`}
             </button>
-          </div>
-        )}
-
-        <div className="pointer-events-none flex items-center gap-2">
-          <ViewControls />
-          <LabelsToggle />
+          )}
         </div>
         <div className="w-full max-w-3xl">
           <Timeline />
