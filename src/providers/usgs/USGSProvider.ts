@@ -109,7 +109,7 @@ export class USGSProvider implements ImageryProvider {
     // tiles — always prefer those over the low-res browse preview.
     const entityId = scene.id.replace(`${this.id}:`, '');
     const tiled = (await loadTilesManifest())[entityId];
-    if (tiled) {
+    if (tiled?.approved === true) {
       return {
         kind: 'raster-tiles',
         urlTemplate: tileUrlTemplate(entityId, tiled),
@@ -120,6 +120,11 @@ export class USGSProvider implements ImageryProvider {
         attribution: 'U.S. Geological Survey, declassified national imagery',
       };
     }
+    // Approval gate (rule of 2026-08-12): a pyramid whose placement no
+    // human has approved renders nothing at all — not the tiles, and not
+    // the browse drape either, which would show the very placement that
+    // is awaiting review. The scene stays listed with metadata.
+    if (tiled) return null;
 
     // Archive corner coordinates are systematically wrong (measured
     // 2026-08: Hama 24% undersized + mirrored, Latakia 11% + mirrored,
@@ -164,15 +169,27 @@ export class USGSProvider implements ImageryProvider {
     const harvestedIds = new Set(harvested.map((scene) => scene.id));
     const seeds = DECLASS_SCENES.filter((scene) => !harvestedIds.has(scene.id));
     // Scenes processed into local full-resolution tiles are first-class:
-    // mark them so the UI and year matching can prefer them outright.
+    // mark them so the UI and year matching can prefer them outright —
+    // but only once a human approved the placement (rule of 2026-08-12).
     const tiled = await loadTilesManifest();
     const withFlags = [...harvested, ...seeds].map((scene) => {
       const entityId = scene.id.replace(`${this.id}:`, '');
-      return tiled[entityId]
-        ? { ...scene, metadata: { ...scene.metadata, tiled: true, displayable: true } }
-        : // Placement comes from unverified archive corners only — the
-          // timeline and map must not promise a picture for these.
-          { ...scene, metadata: { ...scene.metadata, approximatePlacement: true } };
+      const entry = tiled[entityId];
+      if (entry?.approved === true) {
+        return { ...scene, metadata: { ...scene.metadata, tiled: true, displayable: true } };
+      }
+      if (entry) {
+        // A pyramid exists but its placement awaits human sign-off: no
+        // HD badge, no overlay, not eligible for quick compare — the UI
+        // shows an honest "pending" state instead.
+        return {
+          ...scene,
+          metadata: { ...scene.metadata, approvalPending: true, displayable: false },
+        };
+      }
+      // Placement comes from unverified archive corners only — the
+      // timeline and map must not promise a picture for these.
+      return { ...scene, metadata: { ...scene.metadata, approximatePlacement: true } };
     });
     const matches = withFlags.filter((scene) => {
       if (query.dateFrom && scene.captureDate < query.dateFrom) return false;

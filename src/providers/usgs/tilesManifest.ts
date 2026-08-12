@@ -11,6 +11,12 @@ export interface TiledSceneEntry {
   maxZoom: number;
   /** Where the tile pyramid lives: object storage or this repository. */
   storage?: 'r2' | 'repo';
+  /**
+   * A human approved this scene's placement (approval gate rule,
+   * 2026-08-12). Absent means pending: the pyramid exists but must not
+   * render on the public map until someone signs off by eye.
+   */
+  approved?: boolean;
 }
 
 let manifestPromise: Promise<Record<string, TiledSceneEntry>> | null = null;

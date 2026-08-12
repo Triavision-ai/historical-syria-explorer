@@ -1,0 +1,187 @@
+name: Prepare a raw scene pyramid (unplaced)
+
+# Raw-first preparation: downloads the original USGS film scan for one
+# declassified scene, mosaics its segments WITHOUT any georeferencing, cuts
+# a neutral pixel pyramid (gdal2tiles raster profile, lossless PNG), and
+# publishes it to R2 under raw/<entityId>/ plus an entry in
+# public/tiles/raw-index.json. A human then places the film by eye
+# (similarity-only: move/rotate/scale/mirror) BEFORE any geographic bake —
+# the pixels are never resampled or reshaped here.
+#
+# Requires the same USGS_M2M_USERNAME / USGS_M2M_TOKEN secrets as the
+# catalog harvest and the same R2 secrets as tile-declass-scene.yml.
+
+on:
+  workflow_dispatch:
+    inputs:
+      entity_id:
+        description: 'Candidate scene entity ids, comma-separated (first digitized one wins)'
+        required: true
+      dataset:
+        description: 'M2M dataset (declassi | declassii | declassiii, or as harvested e.g. corona2)'
+        required: true
+        default: 'declassii'
+      clean_r2:
+        description: "Delete the scene's existing raw R2 tiles first (use to rebuild a pyramid)"
+        required: false
+        default: 'false'
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      # Dispatch inputs are untrusted text. They must never be interpolated
+      # into a run script (GitHub substitutes ${{ }} textually, so shell
+      # metacharacters become code). This step holds no secrets and rejects
+      # anything outside the expected shapes before any privileged step runs.
+      - name: Validate inputs (no secrets in this step)
+        env:
+          ENTITY_ID: ${{ inputs.entity_id }}
+          DATASET: ${{ inputs.dataset }}
+          CLEAN_R2: ${{ inputs.clean_r2 }}
+        run: |
+          set -eu
+          [[ "$ENTITY_ID" =~ ^[A-Za-z0-9_-]+(,[A-Za-z0-9_-]+)*$ ]] \
+            || { echo "entity_id rejected: must be comma-separated ids [A-Za-z0-9_-]"; exit 1; }
+          [[ "$DATASET" =~ ^[a-z0-9]+$ ]] \
+            || { echo "dataset rejected: lowercase alphanumeric id expected"; exit 1; }
+          [[ "$CLEAN_R2" =~ ^(true|false)$ ]] \
+            || { echo "clean_r2 rejected: true or false expected"; exit 1; }
+          echo "all inputs validated"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install GDAL
+        run: sudo apt-get update -q && sudo apt-get install -y -q gdal-bin python3-gdal unzip
+
+      - name: Download product from USGS
+        id: download
+        env:
+          USGS_M2M_USERNAME: ${{ secrets.USGS_M2M_USERNAME }}
+          USGS_M2M_TOKEN: ${{ secrets.USGS_M2M_TOKEN }}
+          ENTITY_ID: ${{ inputs.entity_id }}
+          DATASET: ${{ inputs.dataset }}
+        run: |
+          OUT=$(node scripts/download-declass.mjs "$ENTITY_ID" "$DATASET" /tmp/dl)
+          echo "$OUT"
+          echo "file=$(echo "$OUT" | tail -1)" >> "$GITHUB_OUTPUT"
+          echo "entity=$(echo "$OUT" | grep '^CHOSEN:' | tail -1 | cut -d: -f2)" >> "$GITHUB_OUTPUT"
+          ls -lh /tmp/dl
+
+      - name: Extract archive if needed
+        id: extract
+        env:
+          FILE: ${{ steps.download.outputs.file }}
+        run: |
+          mkdir -p /tmp/extracted
+          case "$FILE" in
+            *.zip) unzip -o "$FILE" -d /tmp/extracted ;;
+            *.tar.gz|*.tgz) tar -xzf "$FILE" -C /tmp/extracted ;;
+            *.tar) tar -xf "$FILE" -C /tmp/extracted ;;
+            *) cp "$FILE" /tmp/extracted/ ;;
+          esac
+          rm -f "$FILE"
+          COUNT=$(find /tmp/extracted -type f \( -iname '*.tif' -o -iname '*.tiff' \) | wc -l)
+          if [ "$COUNT" = "0" ]; then echo "No raster found"; find /tmp/extracted -type f | head; exit 1; fi
+          echo "Found $COUNT film segment(s)"
+
+      - name: Mosaic and cut the raw pyramid (no geography)
+        id: raw
+        env:
+          ENTITY: ${{ steps.download.outputs.entity }}
+        run: |
+          set -e
+          PREP=$(node scripts/prepare-raw.mjs "$ENTITY" /tmp/extracted)
+          echo "$PREP"
+          VRT=$(echo "$PREP" | grep '^VRT:' | cut -d: -f2-)
+          WIDTH=$(echo "$PREP" | grep '^WIDTH:' | cut -d: -f2-)
+          HEIGHT=$(echo "$PREP" | grep '^HEIGHT:' | cut -d: -f2-)
+          # Native pyramid depth: the first zoom whose tile grid holds the
+          # whole mosaic at 1:1 — deeper would upsample beyond the scan,
+          # shallower would discard film detail; both are forbidden.
+          MAXZOOM=$(python3 -c "import math; print(math.ceil(math.log2(max($WIDTH, $HEIGHT) / 256)))")
+          echo "mosaic ${WIDTH}x${HEIGHT} px -> raster pyramid z0-${MAXZOOM}"
+          # -p raster tiles pure pixel space (no projection, no warp) so the
+          # film keeps its scanned shape; PNG tiles are lossless.
+          gdal2tiles.py -p raster --xyz -z "0-${MAXZOOM}" -w none --processes=4 "$VRT" /tmp/rawtiles
+          {
+            echo "width=$WIDTH"
+            echo "height=$HEIGHT"
+            echo "maxzoom=$MAXZOOM"
+          } >> "$GITHUB_OUTPUT"
+          du -sh /tmp/rawtiles
+
+      - name: Upload raw tiles to R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          ENTITY: ${{ steps.download.outputs.entity }}
+          CLEAN_R2: ${{ inputs.clean_r2 }}
+        run: |
+          ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          # Browsers need CORS to use tiles as WebGL textures; idempotent.
+          aws s3api put-bucket-cors --bucket syria-tiles --endpoint-url "$ENDPOINT" \
+            --cors-configuration '{"CORSRules":[{"AllowedOrigins":["*"],"AllowedMethods":["GET","HEAD"],"AllowedHeaders":["*"],"MaxAgeSeconds":86400}]}' || true
+          # A pyramid is >100k small files: raise CLI parallelism, and use
+          # --size-only so an interrupted upload resumes instead of
+          # re-sending everything (fresh tiles always differ in mtime).
+          aws configure set default.s3.max_concurrent_requests 64
+          aws configure set default.s3.max_queue_size 10000
+          if [ "$CLEAN_R2" = "true" ]; then
+            echo "Rebuild requested — removing the scene's previous raw tiles first"
+            aws s3 rm "s3://syria-tiles/raw/$ENTITY" \
+              --recursive --endpoint-url "$ENDPOINT" --only-show-errors || true
+          fi
+          aws s3 sync /tmp/rawtiles "s3://syria-tiles/raw/$ENTITY" \
+            --endpoint-url "$ENDPOINT" --no-progress --only-show-errors --size-only \
+            --cache-control "public, max-age=31536000, immutable"
+          echo "Uploaded $(find /tmp/rawtiles -name '*.png' | wc -l) tiles"
+
+      - name: Commit manifest
+        env:
+          ENTITY: ${{ steps.download.outputs.entity }}
+          WIDTH: ${{ steps.raw.outputs.width }}
+          HEIGHT: ${{ steps.raw.outputs.height }}
+          MAXZOOM: ${{ steps.raw.outputs.maxzoom }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Concurrent runs each rewrite the shared registry JSONs, so a
+          # rebase merge can never succeed. Instead: on every attempt, reset
+          # to the latest main and REGENERATE this scene's entry on top.
+          for attempt in 1 2 3 4 5 6; do
+            git fetch -q origin main
+            git reset -q --hard origin/main
+            node scripts/update-raw-manifest.mjs "$ENTITY" "$WIDTH" "$HEIGHT" "$MAXZOOM"
+            git add public/tiles/raw-index.json
+            git commit -q -m "data: raw pyramid for $ENTITY" \
+              || { echo "registry already up to date"; exit 0; }
+            if git push; then exit 0; fi
+            echo "push lost the race, regenerating on latest main (attempt $attempt)"
+            sleep $((RANDOM % 17 + 3))
+          done
+          echo "could not push after 6 attempts"; exit 1
+
+      - name: Trigger Pages deploy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sleep 15  # let the pushed commit become the branch tip before dispatching
+          curl -sS -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/deploy.yml/dispatches" \
+            -d '{"ref":"main"}'

@@ -37,6 +37,10 @@ on:
         description: "Delete the scene's existing R2 tiles first (use after an alignment change)"
         required: false
         default: 'false'
+      approved:
+        description: 'Human verified this placement by eye — publish it (align tool sets this)'
+        required: false
+        default: 'false'
 
 permissions:
   contents: write
@@ -63,6 +67,7 @@ jobs:
           CORNER_ORDER: ${{ inputs.corner_order }}
           CORNERS_JSON: ${{ inputs.corners_json }}
           CLEAN_R2: ${{ inputs.clean_r2 }}
+          APPROVED: ${{ inputs.approved }}
         run: |
           set -eu
           [[ "$ENTITY_ID" =~ ^[A-Za-z0-9_-]+(,[A-Za-z0-9_-]+)*$ ]] \
@@ -75,6 +80,8 @@ jobs:
             || { echo "corner_order rejected: four of nw,ne,se,sw expected"; exit 1; }
           [[ "$CLEAN_R2" =~ ^(true|false)$ ]] \
             || { echo "clean_r2 rejected: true or false expected"; exit 1; }
+          [[ "$APPROVED" =~ ^(true|false)$ ]] \
+            || { echo "approved rejected: true or false expected"; exit 1; }
           node -e '
             const j = process.env.CORNERS_JSON;
             if (!j) process.exit(0);
@@ -140,6 +147,7 @@ jobs:
           ENTITY: ${{ steps.download.outputs.entity }}
           DATASET: ${{ inputs.dataset }}
           MAX_ZOOM: ${{ inputs.max_zoom }}
+          APPROVED: ${{ inputs.approved }}
         run: |
           set -e
           PREP=$(node scripts/prepare-frame.mjs "$ENTITY" "$DATASET" /tmp/extracted)
@@ -220,6 +228,7 @@ jobs:
           BOUNDS: ${{ steps.georef.outputs.bounds }}
           CORNERS: ${{ steps.georef.outputs.corners }}
           ORDER: ${{ steps.georef.outputs.order }}
+          APPROVED: ${{ inputs.approved }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
