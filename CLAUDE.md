@@ -45,9 +45,62 @@ the agreed backlog.
   dispatches tile-declass-scene.yml with a GitHub token the admin keeps
   in their own browser (sessionStorage `ghToken`, tab-lifetime only; a
   GitHub App or reviewed-proposal flow is the planned replacement).
-- Workflows: tile-declass-scene.yml (film → R2 tiles, the core),
-  find-digitized.yml (which frames near a point are downloadable),
-  harvest-declass / harvest-maxar (catalogs), deploy.yml, secret-scan.yml.
+- Workflows: tile-declass-scene.yml (film → R2 tiles; inputs corners_json
+  for a placement and approved=true for the human sign-off),
+  prepare-raw-scene.yml (film → neutral un-placed pyramid under R2
+  raw/<id>/, registered in public/tiles/raw-index.json — the raw-first
+  flow: align first, bake once), archive-scan.yml (originals + COG to R2
+  for inspection), pages-maintenance.yml (cancel stuck Pages deploys),
+  find-digitized.yml, harvest-declass / harvest-maxar, deploy.yml,
+  secret-scan.yml.
+
+## State as of 2026-08-12
+
+- APPROVAL GATE LIVE (Ahmad's rule 1): a declass overlay is public only
+  with "approved": true in public/tiles/index.json — today ONLY Hama
+  (DZB00402700090H020001). Pyramids without it show a PENDING pill, no
+  overlay, no HD badge, displayable:false. update-tiles-manifest.mjs
+  keeps an approval across same-placement re-tiles and DROPS it when
+  bounds move; the align tool's "Apply permanently" passes
+  approved=true — a by-eye placement IS the sign-off. Never hand-add
+  approved without Ahmad's explicit approval of that placement.
+- RAW-FIRST FLOW BUILT (Ahmad's rule 2 + "cut after alignment"):
+  prepare-raw-scene.yml publishes untouched film (segments butt-joined,
+  zero geography/resampling) as a gdal2tiles -p raster --xyz pyramid;
+  align.html lists these under "Raw — not yet placed", streams them,
+  and Apply bakes mercator tiles ONCE from the human placement. Not yet
+  exercised end-to-end — first pilot candidate: DS1104-1009DF014.
+- Ahmad rejected QGIS: all alignment happens in align.html (auto-
+  sharpen after idle, 8192 px detail budget on desktop). He aligns,
+  nobody else; alignment codes may arrive in chat.
+- Re-cut queue after the no-reshape fix: Raqqa strip D3C1209-400566A011
+  re-cut DONE (honest rectangle, pending); Latakia + Deir ez-Zor + the
+  1968 CORONA DS1104-1009DF014 (currently cut old-style: ~1.6x
+  vertically stretched) queued via a send_later trigger at 19:20Z
+  2026-08-12 (USGS was down for Tuesday maintenance — the ETIMEDOUT was
+  them, not us). Hama re-cut deliberately NOT queued: it contains
+  Ahmad's hand alignment (~5% shear from the old method); he decides.
+- Findings that changed plans: the Raqqa strip's archive quad is 35 km
+  RMS from the film's true shape (worst seen); the strip itself covers
+  empty steppe — Raqqa city lies 1.2 km OUTSIDE it (bbox vs true
+  footprint — coverage should one day test the real quad, cf. the
+  Damascus edge case).
+- Landsat fixed by the project's FIRST OUTSIDE CONTRIBUTOR, Ayham Al
+  Moussallam (github.com/AyhamALMoussallam, Ahmad's friend): USGS
+  LandsatLook has no browser CORS, Earth Search thumbnails redirect to
+  requester-pays S3 — migrated to Microsoft Planetary Computer
+  (landsat-c2-l2 + landsat-c2-l1 for 1972-82 MSS), tilejson support in
+  the shared STAC layer. Credited in README Contributors. Handle future
+  fork PRs from him with the same test-locally-then-cherry-pick flow.
+- Repo history rewritten 2026-08-11 (git filter-repo): 11k dead tile
+  PNGs purged, clone dropped 880 MB → ~3 MB (a friend in Syria at
+  10-20 KB/s could not clone). NEVER re-add binaries to git; tiles live
+  in R2 only. Old clones are invalid — always clone fresh.
+- Process rules learned: merge PRs only on green CI (a repo-wide
+  prettier break hid for a week because CI skips main); dispatching a
+  workflow while a push-triggered run is live can poison Pages SHAs
+  (see 08-06 note); actions_list MCP output overflows — parse the
+  saved-to-file JSON with python.
 
 ## State as of 2026-08-10
 
@@ -156,9 +209,9 @@ the agreed backlog.
   Ahmad aligns via the tool; alignment codes may also arrive in chat —
   convert with the similarity+mirror math (see git history of
   corners.json for the Hama example) and re-run with clean_r2=true.
-- SECURITY DEBT: the USGS M2M token and the R2 token were both exposed
-  in chat/screenshots on 2026-07-22. Remind Ahmad to rotate both
-  (handbook §8) — do not let this linger.
+- SECURITY DEBT — RESOLVED 2026-08-11: the R2 token was rotated by Ahmad
+  (old token deleted); the exposed USGS token expired on 2026-07-31 and
+  stale tokens were revoked. Nothing outstanding.
 
 ## Gotchas that cost hours — do not relearn them
 
