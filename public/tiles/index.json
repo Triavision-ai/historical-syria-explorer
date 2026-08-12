@@ -75,5 +75,16 @@
     "minZoom": 8,
     "maxZoom": 16,
     "storage": "r2"
+  },
+  "DS1104-1009DF014": {
+    "bounds": [
+      37.05,
+      35.6160052,
+      39.7999937,
+      36.066
+    ],
+    "minZoom": 8,
+    "maxZoom": 16,
+    "storage": "r2"
   }
 }
