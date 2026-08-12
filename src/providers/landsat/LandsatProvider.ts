@@ -1,21 +1,29 @@
 import { StacImageryProvider } from '../stac/StacImageryProvider';
 import { ENDPOINTS } from '@/config/providers.config';
+import type { StacItem } from '../stac/stacClient';
 
-const PLATFORM_LABELS: Record<string, string> = {
-  'landsat-4': 'Landsat 4 TM',
-  'landsat-5': 'Landsat 5 TM',
-  'landsat-7': 'Landsat 7 ETM+',
-  'landsat-8': 'Landsat 8 OLI',
-  'landsat-9': 'Landsat 9 OLI-2',
-  LANDSAT_4: 'Landsat 4 TM',
-  LANDSAT_5: 'Landsat 5 TM',
-  LANDSAT_7: 'Landsat 7 ETM+',
-  LANDSAT_8: 'Landsat 8 OLI',
-  LANDSAT_9: 'Landsat 9 OLI-2',
+/** Sensor suffix per platform when the item is NOT an MSS scene. */
+const SENSOR_LABELS: Record<string, string> = {
+  'landsat-4': 'TM',
+  'landsat-5': 'TM',
+  'landsat-7': 'ETM+',
+  'landsat-8': 'OLI',
+  'landsat-9': 'OLI-2',
 };
 
 /**
- * Landsat Collection 2 Level-2 (1982–present) via Microsoft Planetary Computer.
+ * Landsat 4 and 5 carried both MSS and TM, so the platform name alone is
+ * ambiguous — the instruments array is the source of truth.
+ */
+function isMss(item: StacItem): boolean {
+  const instruments = item.properties['instruments'];
+  return Array.isArray(instruments) && instruments.includes('mss');
+}
+
+/**
+ * Landsat archive (1972–present) via Microsoft Planetary Computer:
+ * Collection 2 Level-2 (TM/ETM+/OLI, 1982–present) plus Collection 2
+ * Level-1 (MSS, 1972–2013) for the early archive.
  *
  * Chosen over USGS LandsatLook (broken browser CORS + EROS login on browse
  * paths) and Earth Search (thumbnail redirects to requester-pays S3 with no
@@ -27,11 +35,14 @@ export function createLandsatProvider(): StacImageryProvider {
     id: 'landsat',
     displayName: 'Landsat (USGS)',
     description:
-      'Landsat Collection 2 Level-2 archive (1982–today) via Microsoft Planetary Computer. Public domain.',
+      'Landsat Collection 2 archive (1972–today) via Microsoft Planetary Computer. Public domain.',
     endpoint: ENDPOINTS.landsatStac,
-    collections: ['landsat-c2-l2'],
-    temporalRange: { from: 1982, to: 'present' },
+    collections: ['landsat-c2-l2', 'landsat-c2-l1'],
+    temporalRange: { from: 1972, to: 'present' },
     missions: [
+      'Landsat 1 MSS',
+      'Landsat 2 MSS',
+      'Landsat 3 MSS',
       'Landsat 4 TM',
       'Landsat 5 TM',
       'Landsat 7 ETM+',
@@ -52,8 +63,12 @@ export function createLandsatProvider(): StacImageryProvider {
     tileMaxZoom: 13,
     missionOf: (item) => {
       const platform = String(item.properties['platform'] ?? '');
-      return PLATFORM_LABELS[platform] ?? (platform.replace(/[_-]/g, ' ') || 'Landsat');
+      const name = platform.replace(/[_-]/g, ' ').replace(/^l/, 'L') || 'Landsat';
+      if (isMss(item)) return `${name} MSS`;
+      const sensor = SENSOR_LABELS[platform.toLowerCase()];
+      return sensor ? `${name} ${sensor}` : name;
     },
-    resolutionOf: () => 30,
+    /** MSS products are delivered at 60 m pixels; TM/ETM+/OLI at 30 m. */
+    resolutionOf: (item) => (isMss(item) ? 60 : 30),
   });
 }

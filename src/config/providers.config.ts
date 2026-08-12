@@ -35,8 +35,7 @@ export const ENDPOINTS = {
    * unusable from browsers (broken CORS + EROS login on /data/), and Earth
    * Search's thumbnail link redirects to requester-pays S3 without CORS.
    */
-  landsatStac:
-    env.VITE_LANDSAT_STAC ?? 'https://planetarycomputer.microsoft.com/api/stac/v1',
+  landsatStac: env.VITE_LANDSAT_STAC ?? 'https://planetarycomputer.microsoft.com/api/stac/v1',
 
   /** Element 84 Earth Search STAC — public, no key, Sentinel-2 2015–present. */
   earthSearchStac: env.VITE_EARTH_SEARCH_STAC ?? 'https://earth-search.aws.element84.com/v1',

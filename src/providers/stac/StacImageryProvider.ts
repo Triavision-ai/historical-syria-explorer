@@ -146,10 +146,7 @@ export class StacImageryProvider implements ImageryProvider {
     const tilejsonUrl = scene.metadata['tilejsonUrl'];
     if (typeof tilejsonUrl === 'string' && tilejsonUrl.startsWith('http')) {
       try {
-        const tilejson = await fetchJson<TileJson>(
-          tilejsonUrl,
-          signal ? { signal } : undefined,
-        );
+        const tilejson = await fetchJson<TileJson>(tilejsonUrl, signal ? { signal } : undefined);
         const template = tilejson.tiles?.[0];
         if (template) {
           const reportedMax = tilejson.maxzoom ?? this.config.tileMaxZoom;
@@ -218,9 +215,7 @@ export class StacImageryProvider implements ImageryProvider {
 
     const previewUrl = this.pickPreviewUrl(item);
     const cogUrl = this.httpsOnly(pickAssetHref(item, this.config.cogAssetKeys));
-    const tilejsonUrl = this.httpsOnly(
-      pickAssetHref(item, this.config.tilejsonAssetKeys ?? []),
-    );
+    const tilejsonUrl = this.httpsOnly(pickAssetHref(item, this.config.tilejsonAssetKeys ?? []));
     const selfLink = item.links?.find((link) => link.rel === 'self')?.href;
     const resolution = this.config.resolutionOf(item);
 
