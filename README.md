@@ -16,6 +16,10 @@ This is an educational, non-commercial project under active development. It is a
 
 This project is supported by the [German-Syrian Research Foundation](https://ds-fg.com) ([GitHub](https://github.com/German-Syrian-Research-Foundation)). The application remains free, open source, and non-commercial.
 
+### Contributors
+
+- [Ayham Al Moussallam](https://github.com/AyhamALMoussallam) — diagnosed the broken in-browser Landsat delivery (CORS) and migrated the provider to Microsoft Planetary Computer.
+
 ## Privacy
 
 There are no accounts, no ads, and no individual tracking. The site uses Cloudflare Web Analytics, a cookie-free counter that records only aggregate visit numbers (visits per day, country, browser type) and collects no personal data.
@@ -32,7 +36,7 @@ There are no accounts, no ads, and no individual tracking. The site uses Cloudfl
 | Source                                                          | Period                     | Resolution | Access                                                                                                                                              |
 | --------------------------------------------------------------- | -------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | USGS declassified reconnaissance film (CORONA, GAMBIT, HEXAGON) | 1960-1984                  | 0.6-9 m    | 8,564 scenes over Syria indexed; selected frames processed to full resolution (see below)                                                           |
-| Landsat (USGS/NASA)                                             | 1982-present               | 30 m       | Full archive, searched live via Planetary Computer                                                                                                  |
+| Landsat (USGS/NASA)                                             | 1972-present               | 30-60 m    | Full archive, searched live via Planetary Computer                                                                                                  |
 | Sentinel-2 (ESA Copernicus)                                     | 2015-present               | 10 m       | Full archive, searched live                                                                                                                         |
 | Esri World Imagery Wayback                                      | 2014-present               | varies     | Map-publication snapshots for all of Syria; the label is the release date, not necessarily the local capture date, and local detail varies by place |
 | Maxar Open Data Program                                         | around the 2023 earthquake | ~0.4 m     | 1,422 scenes over northwest Syria                                                                                                                   |
