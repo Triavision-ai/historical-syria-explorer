@@ -13,6 +13,11 @@ the agreed backlog.
 - NEVER degrade imagery: no lossy intermediates (DEFLATE, not JPEG), no
   downsampling below the film's native resolution, no upsampling beyond it
   (the tile workflow enforces both — keep it that way).
+- NEVER reshape the film (Ahmad, 2026-08-12, after losing a week to
+  twisted frames): archive corner quads only POSITION a scene —
+  prepare-frame.mjs fits rotation + uniform scale + translation
+  (+ mirror) and pins GCPs to that fitted rectangle. No shear, no
+  trapezoid warp, ever. Ahmad aligns by eye from there.
 - No hardcoded endpoints (src/config/providers.config.ts only) and no
   credentials in code, git history, or chat. Secrets live exclusively in
   GitHub Actions secrets. gitleaks runs on every push.

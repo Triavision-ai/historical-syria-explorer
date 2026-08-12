@@ -228,18 +228,91 @@ ${sources}
 const vrtPath = join(tifDir, 'mosaic.vrt');
 await writeFile(vrtPath, vrt);
 
+// ---------- 4b. rigid placement: the film keeps its scanned shape ----------
+// HARD RULE (Ahmad, 2026-08-12): the film is NEVER reshaped. Archive corner
+// quads are often crooked (the Raqqa strip's quad was a 2.2x trapezoid) and
+// pinning the scan's corners to them shears the image into a shape that no
+// move/rotate/scale alignment can ever fix. The quad is therefore used only
+// to POSITION the frame: fit the best rotation + uniform scale + translation
+// (mirror handled via the corner order's handedness) of the pixel rectangle
+// onto the quad, and pin the GCPs to that fitted rectangle. gdalwarp's
+// affine then reproduces a pure similarity — no shear, no trapezoid.
 const [c0, c1, c2, c3] = best.order.map((key) => corners[key]);
-const gcps = [
-  `-gcp 0 0 ${c0.lon} ${c0.lat}`,
-  `-gcp ${best.width} 0 ${c1.lon} ${c1.lat}`,
-  `-gcp ${best.width} ${best.height} ${c2.lon} ${c2.lat}`,
-  `-gcp 0 ${best.height} ${c3.lon} ${c3.lat}`,
+const geo = [c0, c1, c2, c3];
+const lat0 = geo.reduce((sum, c) => sum + c.lat, 0) / 4;
+const lon0 = geo.reduce((sum, c) => sum + c.lon, 0) / 4;
+const kx = 111320 * Math.cos((lat0 * Math.PI) / 180);
+const ky = 110540;
+const G = geo.map((c) => [(c.lon - lon0) * kx, (c.lat - lat0) * ky]);
+const pixelCorners = [
+  [0, 0],
+  [best.width, 0],
+  [best.width, best.height],
+  [0, best.height],
 ];
+// Flip y so the pixel frame is right-handed like the geographic one.
+const P = pixelCorners.map(([x, y]) => [x, -y]);
+const centroid = (pts) => [0, 1].map((k) => pts.reduce((sum, p) => sum + p[k], 0) / pts.length);
+const cP = centroid(P);
+const cG = centroid(G);
+
+function fitSimilarity(reflect) {
+  let a = 0;
+  let b = 0;
+  let pp = 0;
+  for (let i = 0; i < 4; i++) {
+    const u = reflect ? -(P[i][0] - cP[0]) : P[i][0] - cP[0];
+    const v = P[i][1] - cP[1];
+    const X = G[i][0] - cG[0];
+    const Y = G[i][1] - cG[1];
+    a += u * X + v * Y;
+    b += u * Y - v * X;
+    pp += u * u + v * v;
+  }
+  const theta = Math.atan2(b, a);
+  const scale = Math.hypot(a, b) / pp;
+  const map = ([x, y]) => {
+    const u = reflect ? -(x - cP[0]) : x - cP[0];
+    const v = y - cP[1];
+    return [
+      cG[0] + scale * (Math.cos(theta) * u - Math.sin(theta) * v),
+      cG[1] + scale * (Math.sin(theta) * u + Math.cos(theta) * v),
+    ];
+  };
+  const residual = Math.sqrt(
+    P.reduce((sum, p, i) => {
+      const m = map(p);
+      return sum + (m[0] - G[i][0]) ** 2 + (m[1] - G[i][1]) ** 2;
+    }, 0) / 4,
+  );
+  return { map, residual };
+}
+
+const plain = fitSimilarity(false);
+const flipped = fitSimilarity(true);
+const chosen = flipped.residual < plain.residual ? flipped : plain;
+console.error(
+  `rigid placement: quad deviates ${(chosen.residual / 1000).toFixed(2)} km RMS from the ` +
+    `film's true shape (this twist is NOT applied to the image)` +
+    (chosen === flipped ? '; corner order implies a mirrored scan' : ''),
+);
+
+const toLonLat = ([X, Y]) => [lon0 + X / kx, lat0 + Y / ky];
+const fitted = P.map((p) => toLonLat(chosen.map(p)));
+const gcps = pixelCorners.map(
+  ([x, y], i) => `-gcp ${x} ${y} ${fitted[i][0].toFixed(7)} ${fitted[i][1].toFixed(7)}`,
+);
 console.log(`VRT:${vrtPath}`);
 console.log(`GCPS:${gcps.join(' ')}`);
 // Machine-readable record of the mapping used — the workflow persists this
-// to the calibration registry so tools (and re-runs) can build on it.
+// to the calibration registry so tools (and re-runs) can build on it. The
+// persisted quad is the FITTED rectangle (what is actually on the map),
+// not the crooked input.
 console.log(`ORDER:${best.order.join(',')}`);
 console.log(
-  `CORNERS:${JSON.stringify(Object.fromEntries(Object.entries(corners).map(([k, v]) => [k, [v.lon, v.lat]])))}`,
+  `CORNERS:${JSON.stringify(
+    Object.fromEntries(
+      best.order.map((key, i) => [key, [+fitted[i][0].toFixed(7), +fitted[i][1].toFixed(7)]]),
+    ),
+  )}`,
 );
