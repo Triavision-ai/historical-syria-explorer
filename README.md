@@ -32,7 +32,7 @@ There are no accounts, no ads, and no individual tracking. The site uses Cloudfl
 | Source                                                          | Period                     | Resolution | Access                                                                                                                                              |
 | --------------------------------------------------------------- | -------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | USGS declassified reconnaissance film (CORONA, GAMBIT, HEXAGON) | 1960-1984                  | 0.6-9 m    | 8,564 scenes over Syria indexed; selected frames processed to full resolution (see below)                                                           |
-| Landsat (USGS/NASA)                                             | 1972-present               | 30-60 m    | Full archive, searched live                                                                                                                         |
+| Landsat (USGS/NASA)                                             | 1982-present               | 30 m       | Full archive, searched live via Planetary Computer                                                                                                  |
 | Sentinel-2 (ESA Copernicus)                                     | 2015-present               | 10 m       | Full archive, searched live                                                                                                                         |
 | Esri World Imagery Wayback                                      | 2014-present               | varies     | Map-publication snapshots for all of Syria; the label is the release date, not necessarily the local capture date, and local detail varies by place |
 | Maxar Open Data Program                                         | around the 2023 earthquake | ~0.4 m     | 1,422 scenes over northwest Syria                                                                                                                   |
@@ -76,7 +76,7 @@ src/
   providers/        Imagery source plugins
     registry.ts       Provider registry (dependency injection)
     stac/             Generic STAC API client and provider base
-    landsat/          Landsat via the USGS LandsatLook STAC API
+    landsat/          Landsat via Planetary Computer (USGS Collection 2)
     sentinel/         Sentinel-2 via Earth Search on AWS
     usgs/             Declassified film: catalog, M2M client, local tiles
     wayback/          Esri World Imagery Wayback snapshots
