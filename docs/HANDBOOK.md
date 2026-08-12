@@ -329,7 +329,7 @@ APIs only).
 | Provider (id) | Years | Georeferencing | Source of truth |
 |---|---|---|---|
 | USGS declass (`usgs-declass`) | 1960–1984 | none on film → our pipeline + registry | `public/catalog/declass-syria.json` (closed archive, harvested once); M2M credentials are workflow-only, never in the browser |
-| Landsat (`landsat`) | 1972– | native | LandsatLook STAC, queried live |
+| Landsat (`landsat`) | 1972– | native | Planetary Computer STAC (`landsat-c2-l2` + `landsat-c2-l1` for the MSS era), queried live |
 | Sentinel-2 (`sentinel2`) | 2015– | native | Earth Search STAC, queried live |
 | Esri Wayback (`esri-wayback`) | 2014– | native | waybackconfig.json, queried live (grows by itself) |
 | Maxar Open Data (`maxar-open`) | events (2023 quake) | native | `public/catalog/maxar-syria.json`, refresh via harvest workflow |
