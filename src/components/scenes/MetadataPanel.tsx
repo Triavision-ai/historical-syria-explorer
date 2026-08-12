@@ -24,6 +24,7 @@ export function MetadataPanel() {
     .filter(([key, value]) => !PROMINENT_KEYS.has(key) && isScalar(value))
     .slice(0, MAX_METADATA_ROWS);
   const orderingNote = scene.metadata['orderingNote'];
+  const approvalPending = scene.metadata['approvalPending'] === true;
   // The thumbnail is a tiny archive image and turns to mush at panel width;
   // prefer the full browse image and fall back only when there is none.
   const preview = scene.previewUrl ?? scene.thumbnail;
@@ -76,7 +77,13 @@ export function MetadataPanel() {
         )}
 
         {sceneLayerLoading && <p className="mb-3 text-xs text-accent-400">Loading preview…</p>}
-        {!sceneLayerLoading && !sceneLayer && (
+        {approvalPending && (
+          <p className="mb-3 rounded-lg border border-amber-hl/30 bg-amber-hl/10 px-3 py-2 text-xs text-amber-hl">
+            Full-resolution tiles exist for this scene, but their placement has not been
+            human-verified yet. The map overlay stays hidden until an editor approves the alignment.
+          </p>
+        )}
+        {!sceneLayerLoading && !sceneLayer && !approvalPending && (
           <p className="mb-3 rounded-lg border border-amber-hl/30 bg-amber-hl/10 px-3 py-2 text-xs text-amber-hl">
             No displayable preview for this scene yet — the product is ordered from the archive.
             Metadata and ordering links below.

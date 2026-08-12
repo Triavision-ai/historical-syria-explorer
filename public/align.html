@@ -74,12 +74,15 @@
       const TILES_BASE = 'https://pub-f8ac6c500eea43b28591b7b636fc9e3d.r2.dev';
       const $ = (id) => document.getElementById(id);
       const state = {
-        manifest: {}, sceneId: null, entry: null,
-        baseQuad: null,        // canvas image corners before user transform [tl,tr,br,bl] as [lon,lat]
+        manifest: {}, rawIndex: {}, sceneId: null, entry: null,
+        raw: false,            // true = un-placed raw pyramid from tiles/raw-index.json
+        baseQuad: null,        // frame reference corners before user transform [tl,tr,br,bl] as [lon,lat]
+        oldQuad: null,         // 'old' snapshot coverage in frame space (== baseQuad for baked scenes)
         boundsQuad: null,      // scene bounds corners before transform (for the output code)
         center: null,          // rotation/scale pivot [lon,lat]
         dx: 0, dy: 0, theta: 0, scale: 1,
         moveMode: false, dragging: false, dragStart: null, dragBase: null,
+        lastPatch: null,       // {zoom, rect} of the last sharpen fetch, for the auto-sharpen skip
       };
 
       const map = new maplibregl.Map({
@@ -122,18 +125,34 @@
 
       /** Detail budget for "Sharpen here": match the real screen, not a
        *  fixed 2048. A phone asks for little, a desktop for a lot, so the
-       *  film is shown at its native detail without wasting requests. */
+       *  film is shown at its native detail without wasting requests.
+       *  8192 is the common GPU texture ceiling — one image source cannot
+       *  usefully be larger than one texture. */
       function screenDetailPx() {
         const dpr = Math.min(window.devicePixelRatio || 1, 3);
         const wide = Math.max(window.innerWidth, window.innerHeight) * dpr;
-        return Math.round(Math.max(2048, Math.min(6144, wide * 1.25)));
+        return Math.round(Math.max(2048, Math.min(8192, wide * 1.25)));
+      }
+
+      /** Highest zoom that keeps a stitched snapshot within the detail budget. */
+      function pickWebZoom(entry, [w, , e], maxPx) {
+        let z = entry.maxZoom;
+        while (z > entry.minZoom && (lon2x(e, z) - lon2x(w, z)) * 256 > maxPx) z--;
+        return z;
+      }
+      /** Same for a raw pyramid; rect is [x0,y0,x1,y1] in film pixels. At
+       *  zoom z the mosaic is downscaled by 2^(maxZoom-z), so pick the zoom
+       *  whose scaled rect comes closest to the budget without exceeding it. */
+      function pickRawZoom(entry, [x0, y0, x1, y1], maxPx) {
+        let z = entry.maxZoom;
+        while (z > 0 && Math.max(x1 - x0, y1 - y0) / 2 ** (entry.maxZoom - z) > maxPx) z--;
+        return z;
       }
 
       /** Stitch the scene's tiles over [w,s,e,n] into one canvas (≤ maxPx wide). */
       async function buildSnapshot(id, entry, bounds, maxPx = 2048) {
         const [w, s, e, n] = bounds;
-        let z = entry.maxZoom;
-        while (z > entry.minZoom && (lon2x(e, z) - lon2x(w, z)) * 256 > maxPx) z--;
+        const z = pickWebZoom(entry, bounds, maxPx);
         const x0 = Math.floor(lon2x(w, z)), x1 = Math.floor(lon2x(e, z));
         const y0 = Math.floor(lat2y(n, z)), y1 = Math.floor(lat2y(s, z));
         const canvas = document.createElement('canvas');
@@ -162,6 +181,44 @@
         return { url, quad, zoom: z, px: canvas.width };
       }
 
+      /** Stitch raw (not yet georeferenced) pyramid tiles covering a
+       *  film-pixel rect [x0,y0,x1,y1] into one canvas (≤ maxPx on the long
+       *  side). Layout is gdal2tiles -p raster --xyz: y=0 at the TOP, the
+       *  image fills the grid's top-left, edge tiles are padded right and
+       *  bottom. Relies on state.baseQuad being the frame's placement quad
+       *  (filmRectQuad), so the caller must set it first. */
+      async function buildRawSnapshot(id, entry, rect, maxPx = 2048) {
+        const [rx0, ry0, rx1, ry1] = rect;
+        const z = pickRawZoom(entry, rect, maxPx);
+        const f = 2 ** (entry.maxZoom - z);
+        // The rect in this zoom's scaled mosaic, clamped to the scaled size.
+        const sw = Math.ceil(entry.width / f), sh = Math.ceil(entry.height / f);
+        const sx0 = Math.max(0, Math.floor(rx0 / f)), sy0 = Math.max(0, Math.floor(ry0 / f));
+        const sx1 = Math.min(sw, Math.ceil(rx1 / f)), sy1 = Math.min(sh, Math.ceil(ry1 / f));
+        const canvas = document.createElement('canvas');
+        canvas.width = sx1 - sx0; canvas.height = sy1 - sy0;
+        const ctx = canvas.getContext('2d');
+        const jobs = [];
+        for (let tx = Math.floor(sx0 / 256); tx <= Math.floor((sx1 - 1) / 256); tx++)
+          for (let ty = Math.floor(sy0 / 256); ty <= Math.floor((sy1 - 1) / 256); ty++) {
+            jobs.push(new Promise((resolve) => {
+              const img = new Image();
+              img.crossOrigin = 'anonymous';
+              // Tiles land at their mosaic offset; the canvas edge crops the
+              // padding gdal2tiles adds to the right/bottom edge tiles.
+              img.onload = () => { ctx.drawImage(img, tx * 256 - sx0, ty * 256 - sy0); resolve(); };
+              img.onerror = () => resolve();
+              img.src = `${TILES_BASE}/raw/${id}/${z}/${tx}/${ty}.png`;
+            }));
+          }
+        await Promise.all(jobs);
+        const quad = filmRectQuad([sx0 * f, sy0 * f, (sx0 + canvas.width) * f, (sy0 + canvas.height) * f]);
+        const url = await new Promise((resolve) =>
+          canvas.toBlob((blob) => resolve(URL.createObjectURL(blob)), 'image/png'),
+        );
+        return { url, quad, zoom: z, px: canvas.width };
+      }
+
       /** Blob URLs are ours to free; drop the previous one when replacing. */
       const objectUrls = {};
       function setObjectUrl(key, url) {
@@ -170,9 +227,13 @@
       }
 
       // ---- geometry: similarity transform about the pivot, in local meters ----
+      // kLat/kLon MUST match prepare-frame.mjs's fit metric (ky=110540,
+      // kx=111320·cos): a rotation that is a similarity here but not there
+      // gets "corrected" by the pipeline's rigid fit, baking the frame up to
+      // ~500 m away from where the admin placed it at film-typical rotations.
       function transformed(quad) {
         const [cx, cy] = state.center;
-        const kLat = 111320, kLon = kLat * Math.cos((cy * Math.PI) / 180);
+        const kLat = 110540, kLon = 111320 * Math.cos((cy * Math.PI) / 180);
         const cos = Math.cos(state.theta), sin = Math.sin(state.theta);
         return quad.map(([lon, lat]) => {
           const x = (lon - cx) * kLon, y = (lat - cy) * kLat;
@@ -184,7 +245,7 @@
       /** Map a displayed (transformed) point back to the untransformed frame. */
       function inverse([lon, lat]) {
         const [cx, cy] = state.center;
-        const kLat = 111320, kLon = kLat * Math.cos((cy * Math.PI) / 180);
+        const kLat = 110540, kLon = 111320 * Math.cos((cy * Math.PI) / 180);
         const x = (lon - state.dx - cx) * kLon, y = (lat - state.dy - cy) * kLat;
         const cos = Math.cos(-state.theta), sin = Math.sin(-state.theta);
         const xr = (x * cos - y * sin) / state.scale, yr = (x * sin + y * cos) / state.scale;
@@ -199,14 +260,38 @@
       /** Frame-space mirror (before the similarity transform) when enabled. */
       const inFrame = (quad) => (state.mirror ? quad.map(mirrorBase) : quad);
 
+      // ---- raw scenes: linear film-pixel <-> untransformed lon/lat map ----
+      // baseQuad is the film rectangle's north-up placement, so pixel (0,0)
+      // is its top-left corner and y grows southward.
+      function filmToGeo(px, py) {
+        const [tl, tr, , bl] = state.baseQuad;
+        return [
+          tl[0] + (px / state.entry.width) * (tr[0] - tl[0]),
+          tl[1] + (py / state.entry.height) * (bl[1] - tl[1]),
+        ];
+      }
+      function geoToFilm([lon, lat]) {
+        const [tl, tr, , bl] = state.baseQuad;
+        return [
+          ((lon - tl[0]) / (tr[0] - tl[0])) * state.entry.width,
+          ((lat - tl[1]) / (bl[1] - tl[1])) * state.entry.height,
+        ];
+      }
+      function filmRectQuad([x0, y0, x1, y1]) {
+        return [filmToGeo(x0, y0), filmToGeo(x1, y0), filmToGeo(x1, y1), filmToGeo(x0, y1)];
+      }
+
       function refresh() {
-        if (!state.baseQuad) return;
-        map.getSource('old')?.setCoordinates(transformed(inFrame(state.baseQuad)));
+        if (!state.baseQuad || !state.oldQuad) return;
+        map.getSource('old')?.setCoordinates(transformed(inFrame(state.oldQuad)));
         if (state.patchQuad)
           map.getSource('patch')?.setCoordinates(transformed(inFrame(state.patchQuad)));
         const q = transformed(state.boundsQuad).map((c) => c.map((v) => Number(v.toFixed(6))));
         $('out').value = JSON.stringify({
           scene: state.sceneId,
+          // Raw codes must be self-describing when pasted in a chat: this
+          // placement has no georeference yet and belongs to that dataset.
+          ...(state.raw ? { raw: true, dataset: state.entry.dataset } : {}),
           move: { dLon: +state.dx.toFixed(6), dLat: +state.dy.toFixed(6) },
           rotateDeg: +((state.theta * 180) / Math.PI).toFixed(3),
           scale: +state.scale.toFixed(4),
@@ -216,19 +301,45 @@
         });
       }
 
-      async function selectScene(id) {
-        state.sceneId = id; state.entry = state.manifest[id];
-        state.dx = state.dy = state.theta = 0; state.scale = 1; state.patchQuad = null;
+      /** value is the <select> value: an entity id, or "raw:<id>" for an
+       *  un-placed raw pyramid from tiles/raw-index.json. */
+      async function selectScene(value) {
+        const isRaw = value.startsWith('raw:');
+        const id = isRaw ? value.slice(4) : value;
+        state.sceneId = id; state.raw = isRaw;
+        state.entry = isRaw ? state.rawIndex[id] : state.manifest[id];
+        state.dx = state.dy = state.theta = 0; state.scale = 1;
+        state.patchQuad = null; state.oldQuad = null; state.lastPatch = null;
         state.mirror = false; $('mirror').classList.remove('active');
         $('rot').value = 0; $('scl').value = 1000; $('rotv').value = '0.0'; $('sclv').value = '100.0';
         $('status').textContent = 'Building scene snapshot…';
         const [w, s, e, n] = state.entry.bounds;
         state.center = [(w + e) / 2, (s + n) / 2];
-        state.boundsQuad = [[w, n], [e, n], [e, s], [w, s]];
+        if (isRaw) {
+          // The catalog footprint is a WHERE hint only (archive quads lie).
+          // The starting rectangle keeps the film's true pixel aspect in
+          // ground kilometers, north-up, scaled to fit inside the footprint;
+          // from there placement is similarity-only, by eye.
+          const [cx, cy] = state.center;
+          // km per degree — same constants as the pipeline's fit metric.
+          const kLon = 111.32 * Math.cos((cy * Math.PI) / 180), kLat = 110.54;
+          const sKm = Math.min(((e - w) * kLon) / state.entry.width, ((n - s) * kLat) / state.entry.height);
+          const dLon = (state.entry.width * sKm) / 2 / kLon, dLat = (state.entry.height * sKm) / 2 / kLat;
+          state.baseQuad = [
+            [cx - dLon, cy + dLat], [cx + dLon, cy + dLat],
+            [cx + dLon, cy - dLat], [cx - dLon, cy - dLat],
+          ];
+          state.boundsQuad = state.baseQuad.map((c) => c.slice());
+        } else {
+          state.boundsQuad = [[w, n], [e, n], [e, s], [w, s]];
+        }
         map.fitBounds([[w, s], [e, n]], { padding: 40, duration: 0 });
-        const snap = await buildSnapshot(id, state.entry, state.entry.bounds);
+        const snap = isRaw
+          ? await buildRawSnapshot(id, state.entry, [0, 0, state.entry.width, state.entry.height])
+          : await buildSnapshot(id, state.entry, state.entry.bounds);
         setObjectUrl('old', snap.url);
-        state.baseQuad = snap.quad;
+        if (!isRaw) state.baseQuad = snap.quad;
+        state.oldQuad = snap.quad;
         for (const layer of ['old', 'patch']) {
           if (map.getLayer(layer)) map.removeLayer(layer);
           if (map.getSource(layer)) map.removeSource(layer);
@@ -236,14 +347,18 @@
         map.addSource('old', { type: 'image', url: snap.url, coordinates: snap.quad });
         map.addLayer({ id: 'old', type: 'raster', source: 'old',
           paint: { 'raster-opacity': Number($('opacity').value) / 100, 'raster-fade-duration': 0 } });
-        $('status').textContent = 'Drag with Move; zoom in and press 🔍 for full detail.';
+        $('status').textContent = isRaw
+          ? 'Raw film — the position is a hint only. Align it by eye, then Apply to bake.'
+          : 'Drag with Move; zoom in and press 🔍 for full detail.';
         refresh();
       }
 
-      /** Re-fetch full-detail tiles for the current view (keeps the transform). */
-      async function sharpenHere() {
-        if (!state.entry) return;
-        $('status').textContent = 'Fetching full-detail tiles for this view…';
+      /** Re-fetch full-detail tiles for the current view (keeps the transform).
+       *  auto=true (idle auto-sharpen) fails silently and skips views that the
+       *  last fetch already covers at the zoom it would pick again. */
+      let sharpenBusy = false;
+      async function sharpenHere(auto = false) {
+        if (!state.entry || !state.oldQuad || sharpenBusy) return;
         const view = map.getBounds();
         // Map the viewport back into the untransformed frame (undoing the
         // mirror too — mirrored content comes from the opposite frame side)
@@ -253,24 +368,57 @@
           back([view.getWest(), view.getNorth()]), back([view.getEast(), view.getNorth()]),
           back([view.getEast(), view.getSouth()]), back([view.getWest(), view.getSouth()]),
         ];
-        const [bw, bs, be, bn] = state.entry.bounds;
-        const w = Math.max(bw, Math.min(...pts.map((p) => p[0])));
-        const e = Math.min(be, Math.max(...pts.map((p) => p[0])));
-        const s = Math.max(bs, Math.min(...pts.map((p) => p[1])));
-        const n = Math.min(bn, Math.max(...pts.map((p) => p[1])));
-        if (!(w < e && s < n)) { $('status').textContent = 'The scene is not in view.'; return; }
-        const snap = await buildSnapshot(state.sceneId, state.entry, [w, s, e, n], screenDetailPx());
-        setObjectUrl('patch', snap.url);
-        state.patchQuad = snap.quad;
-        if (map.getLayer('patch')) map.removeLayer('patch');
-        if (map.getSource('patch')) map.removeSource('patch');
-        map.addSource('patch', { type: 'image', url: snap.url, coordinates: transformed(inFrame(snap.quad)) });
-        map.addLayer({ id: 'patch', type: 'raster', source: 'patch',
-          paint: { 'raster-opacity': Number($('opacity').value) / 100, 'raster-fade-duration': 0 } });
-        const capped = snap.zoom < state.entry.maxZoom;
-        $('status').textContent =
-          `Sharp view at z${snap.zoom}${capped ? ` (native is z${state.entry.maxZoom} — zoom in and press 🔍 again for full detail)` : ' — full native detail'}`;
-        refresh();
+        // rect is [min0, min1, max0, max1]: film pixels for a raw pyramid,
+        // [w, s, e, n] degrees for a baked scene.
+        let rect;
+        if (state.raw) {
+          const film = pts.map(geoToFilm);
+          rect = [
+            Math.max(0, Math.min(...film.map((p) => p[0]))),
+            Math.max(0, Math.min(...film.map((p) => p[1]))),
+            Math.min(state.entry.width, Math.max(...film.map((p) => p[0]))),
+            Math.min(state.entry.height, Math.max(...film.map((p) => p[1]))),
+          ];
+        } else {
+          const [bw, bs, be, bn] = state.entry.bounds;
+          rect = [
+            Math.max(bw, Math.min(...pts.map((p) => p[0]))),
+            Math.max(bs, Math.min(...pts.map((p) => p[1]))),
+            Math.min(be, Math.max(...pts.map((p) => p[0]))),
+            Math.min(bn, Math.max(...pts.map((p) => p[1]))),
+          ];
+        }
+        if (!(rect[0] < rect[2] && rect[1] < rect[3])) {
+          if (!auto) $('status').textContent = 'The scene is not in view.';
+          return;
+        }
+        const budget = screenDetailPx();
+        const zoom = state.raw ? pickRawZoom(state.entry, rect, budget) : pickWebZoom(state.entry, rect, budget);
+        // Auto runs skip when the last patch already shows this view at the
+        // zoom we would fetch — no request churn while idling in one place.
+        const covered = (a, b) => a[0] >= b[0] && a[1] >= b[1] && a[2] <= b[2] && a[3] <= b[3];
+        if (auto && state.lastPatch && zoom === state.lastPatch.zoom && covered(rect, state.lastPatch.rect)) return;
+        sharpenBusy = true;
+        try {
+          $('status').textContent = 'Fetching full-detail tiles for this view…';
+          const snap = state.raw
+            ? await buildRawSnapshot(state.sceneId, state.entry, rect, budget)
+            : await buildSnapshot(state.sceneId, state.entry, rect, budget);
+          state.lastPatch = { zoom: snap.zoom, rect };
+          setObjectUrl('patch', snap.url);
+          state.patchQuad = snap.quad;
+          if (map.getLayer('patch')) map.removeLayer('patch');
+          if (map.getSource('patch')) map.removeSource('patch');
+          map.addSource('patch', { type: 'image', url: snap.url, coordinates: transformed(inFrame(snap.quad)) });
+          map.addLayer({ id: 'patch', type: 'raster', source: 'patch',
+            paint: { 'raster-opacity': Number($('opacity').value) / 100, 'raster-fade-duration': 0 } });
+          const capped = snap.zoom < state.entry.maxZoom;
+          $('status').textContent =
+            `Sharp view at z${snap.zoom}${capped ? ` (native is z${state.entry.maxZoom} — zoom in and press 🔍 again for full detail)` : ' — full native detail'}`;
+          refresh();
+        } finally {
+          sharpenBusy = false;
+        }
       }
 
       // ---- interactions ----
@@ -370,13 +518,31 @@
         window.addEventListener('pointerup', onUp);
       });
 
-      $('sharpen').onclick = sharpenHere;
+      // The click event object must not leak into sharpenHere's auto flag.
+      $('sharpen').onclick = () => sharpenHere();
+
+      // ---- auto-sharpen: refetch detail once the view settles ----
+      // 1.2 s of quiet after the last pan/zoom, so a gesture chain (pinch,
+      // inertia, double-tap) triggers one fetch, not five. Never while the
+      // admin is mid-drag in Move mode — the film is moving under the
+      // cursor and a patch swap there reads as a glitch.
+      let idleTimer = null;
+      map.on('movestart', () => { if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; } });
+      map.on('moveend', () => {
+        if (idleTimer) clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+          idleTimer = null;
+          if (!state.entry || !state.oldQuad || state.dragging) return;
+          sharpenHere(true);
+        }, 1200);
+      });
+
       $('mirror').onclick = () => {
         state.mirror = !state.mirror;
         $('mirror').classList.toggle('active', state.mirror);
         refresh();
       };
-      $('reset').onclick = () => selectScene(state.sceneId);
+      $('reset').onclick = () => selectScene((state.raw ? 'raw:' : '') + state.sceneId);
       $('copy').onclick = async () => {
         await navigator.clipboard.writeText($('out').value).catch(() => $('out').select());
         $('status').textContent = 'Copied! Paste the code in the chat.';
@@ -396,7 +562,10 @@
       };
       $('apply').onclick = async () => {
         if (!state.sceneId) return;
-        if (!confirm('Re-cut this scene with the current adjustment?\nProcessing takes 1–2 hours; the site updates automatically when done.')) return;
+        const question = state.raw
+          ? 'Bake this placement? Processing takes 1-2 hours; the scene then appears as PENDING until approved.'
+          : 'Re-cut this scene with the current adjustment?\nProcessing takes 1–2 hours; the site updates automatically when done.';
+        if (!confirm(question)) return;
         let token = ghToken.get();
         if (!token) {
           token = (prompt('GitHub access token with Actions write permission on the repository (kept only until this tab closes):') || '').trim();
@@ -405,26 +574,44 @@
         }
         $('status').textContent = 'Submitting to the pipeline…';
         try {
-          const registry = await fetch('tiles/corners.json?t=' + new Date().getTime())
-            .then((r) => (r.ok ? r.json() : {}));
-          const entry = registry[state.sceneId];
-          if (!entry?.corners) {
-            $('status').textContent = 'No calibration record for this scene yet — send the code in the chat instead.';
-            return;
+          let dataset, cornerOrder, corners;
+          if (state.raw) {
+            // First bake of a raw pyramid: the on-screen placement itself is
+            // the calibration. transformed(inFrame(boundsQuad)) is an exact
+            // similarity of the film rectangle, so the pipeline's rigid fit
+            // reproduces it with ~zero residual — what the admin placed is
+            // what gets baked. The order is pinned because the auto-detector
+            // scores only edge aspect, which cannot break the 180°/mirror tie
+            // between labelings of a perfect rectangle.
+            dataset = state.entry.dataset;
+            cornerOrder = 'nw,ne,se,sw';
+            const q = transformed(inFrame(state.boundsQuad));
+            corners = Object.fromEntries(
+              ['nw', 'ne', 'se', 'sw'].map((key, i) => [key, q[i].map((v) => Number(v.toFixed(6)))]),
+            );
+          } else {
+            const registry = await fetch('tiles/corners.json?t=' + new Date().getTime())
+              .then((r) => (r.ok ? r.json() : {}));
+            const entry = registry[state.sceneId];
+            if (!entry?.corners) {
+              $('status').textContent = 'No calibration record for this scene yet — send the code in the chat instead.';
+              return;
+            }
+            // The registry maps mosaic pixel corners → geography; apply the
+            // same on-screen adjustment (mirror in frame space, then the
+            // similarity transform) to those anchor points.
+            corners = {};
+            for (const [key, lonLat] of Object.entries(entry.corners)) {
+              const base = state.mirror ? mirrorBase(lonLat) : lonLat;
+              corners[key] = transformed([base])[0].map((v) => Number(v.toFixed(6)));
+            }
+            cornerOrder = (entry.order ?? []).join(',');
+            dataset = 'declassii';
+            try {
+              const catalog = await fetch('catalog/declass-syria.json').then((r) => r.json());
+              dataset = catalog.scenes.find((s) => s.entityId === state.sceneId)?.dataset ?? dataset;
+            } catch { /* seed default */ }
           }
-          // The registry maps mosaic pixel corners → geography; apply the
-          // same on-screen adjustment (mirror in frame space, then the
-          // similarity transform) to those anchor points.
-          const newCorners = {};
-          for (const [key, lonLat] of Object.entries(entry.corners)) {
-            const base = state.mirror ? mirrorBase(lonLat) : lonLat;
-            newCorners[key] = transformed([base])[0].map((v) => Number(v.toFixed(6)));
-          }
-          let dataset = 'declassii';
-          try {
-            const catalog = await fetch('catalog/declass-syria.json').then((r) => r.json());
-            dataset = catalog.scenes.find((s) => s.entityId === state.sceneId)?.dataset ?? dataset;
-          } catch { /* seed default */ }
           const res = await fetch(
             `https://api.github.com/repos/${REPO}/actions/workflows/tile-declass-scene.yml/dispatches`,
             {
@@ -439,16 +626,22 @@
                 inputs: {
                   entity_id: state.sceneId,
                   dataset,
-                  max_zoom: '18',
-                  corner_order: (entry.order ?? []).join(','),
-                  corners_json: JSON.stringify(newCorners),
+                  max_zoom: state.raw ? '16' : '18',
+                  corner_order: cornerOrder,
+                  corners_json: JSON.stringify(corners),
                   clean_r2: 'true',
+                  // Applying from this tool IS the human sign-off that opens
+                  // the approval gate; automatic first-pass tilings never
+                  // set it, so they stay pending (rule of 2026-08-12).
+                  approved: 'true',
                 },
               }),
             },
           );
           if (res.status === 204) {
-            $('status').textContent = '✓ Accepted — re-cutting now. The site updates itself in 1–2 hours.';
+            $('status').textContent = state.raw
+              ? '✓ Accepted — baking now. The scene shows as PENDING in 1-2 hours.'
+              : '✓ Accepted — re-cutting now. The site updates itself in 1–2 hours.';
           } else {
             if (res.status === 401 || res.status === 403) ghToken.clear();
             $('status').textContent = `Pipeline rejected the request (${res.status}) — check the token and try again.`;
@@ -460,13 +653,28 @@
       $('scene').onchange = (e) => selectScene(e.target.value);
 
       map.on('load', async () => {
-        const res = await fetch('tiles/index.json');
-        state.manifest = res.ok ? await res.json() : {};
+        // raw-index.json lists tiled-but-unplaced pyramids; it does not
+        // exist until the first raw run publishes it, so a 404 is normal.
+        const grab = (url) => fetch(url).then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
+        const [manifest, rawIndex] = await Promise.all([grab('tiles/index.json'), grab('tiles/raw-index.json')]);
+        state.manifest = manifest;
+        state.rawIndex = rawIndex;
         const sel = $('scene');
         for (const id of Object.keys(state.manifest)) {
           const opt = document.createElement('option');
           opt.value = id; opt.textContent = id;
           sel.appendChild(opt);
+        }
+        const rawIds = Object.keys(state.rawIndex);
+        if (rawIds.length) {
+          const group = document.createElement('optgroup');
+          group.label = 'Raw — not yet placed';
+          for (const id of rawIds) {
+            const opt = document.createElement('option');
+            opt.value = 'raw:' + id; opt.textContent = id;
+            group.appendChild(opt);
+          }
+          sel.appendChild(group);
         }
         if (sel.options.length) selectScene(sel.value);
         else $('status').textContent = 'No tiled scenes in the manifest yet.';

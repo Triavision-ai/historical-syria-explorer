@@ -121,6 +121,16 @@ function SceneRow({
             HD
           </span>
         )}
+        {/* Full-res tiles exist but the placement awaits human approval —
+            never advertise these as HD (approval gate rule, 2026-08-12). */}
+        {scene.metadata['approvalPending'] === true && (
+          <span
+            title="Placement not yet human-verified"
+            className="shrink-0 rounded-full border border-amber-hl/40 px-2 py-0.5 text-[10px] font-bold text-amber-hl"
+          >
+            PENDING
+          </span>
+        )}
         <span
           className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
             PROVIDER_BADGE_STYLES[scene.provider] ?? 'bg-surface-700 text-gray-300'
