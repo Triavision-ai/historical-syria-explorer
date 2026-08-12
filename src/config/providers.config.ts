@@ -28,8 +28,14 @@ export const ENDPOINTS = {
     env.VITE_LABEL_TILES ??
     'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
 
-  /** USGS LandsatLook STAC API — public, no key, Landsat 1972–present. */
-  landsatStac: env.VITE_LANDSAT_STAC ?? 'https://landsatlook.usgs.gov/stac-server',
+  /**
+   * Landsat STAC API — public, no key. Defaults to Microsoft Planetary
+   * Computer (Collection 2 Level-2): working CORS and a CORS-safe
+   * `rendered_preview` / tilejson for on-map display. USGS LandsatLook is
+   * unusable from browsers (broken CORS + EROS login on /data/), and Earth
+   * Search's thumbnail link redirects to requester-pays S3 without CORS.
+   */
+  landsatStac: env.VITE_LANDSAT_STAC ?? 'https://planetarycomputer.microsoft.com/api/stac/v1',
 
   /** Element 84 Earth Search STAC — public, no key, Sentinel-2 2015–present. */
   earthSearchStac: env.VITE_EARTH_SEARCH_STAC ?? 'https://earth-search.aws.element84.com/v1',

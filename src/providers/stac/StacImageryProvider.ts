@@ -10,6 +10,7 @@ import type {
 import { geometryBounds } from '@/utils/bbox';
 import { ENDPOINTS } from '@/config/providers.config';
 import { DEFAULT_SEARCH_LIMIT } from '@/config/app.config';
+import { fetchJson } from '@/utils/http';
 import { StacClient, buildStacSearchBody, pickAssetHref } from './stacClient';
 import type { StacItem } from './stacClient';
 
@@ -29,10 +30,20 @@ export interface StacProviderConfig {
   previewAssetKeys: string[];
   /** Asset keys to try (in order) for a Cloud-Optimized GeoTIFF. */
   cogAssetKeys: string[];
+  /** Asset keys for a TileJSON document (XYZ template with CORS-safe tiles). */
+  tilejsonAssetKeys?: string[];
+  /** Cap TileJSON maxzoom (e.g. 13 for 30 m Landsat — deeper is empty upsampling). */
+  tileMaxZoom?: number;
   /** Map a STAC item to a human-readable mission name. */
   missionOf: (item: StacItem) => string;
   /** Ground resolution in meters for items of this source. */
   resolutionOf: (item: StacItem) => number | undefined;
+}
+
+interface TileJson {
+  tiles?: string[];
+  minzoom?: number;
+  maxzoom?: number;
 }
 
 /**
@@ -131,7 +142,33 @@ export class StacImageryProvider implements ImageryProvider {
     return buckets;
   }
 
-  async load(scene: ImageScene, _signal?: AbortSignal): Promise<SceneLayer | null> {
+  async load(scene: ImageScene, signal?: AbortSignal): Promise<SceneLayer | null> {
+    const tilejsonUrl = scene.metadata['tilejsonUrl'];
+    if (typeof tilejsonUrl === 'string' && tilejsonUrl.startsWith('http')) {
+      try {
+        const tilejson = await fetchJson<TileJson>(tilejsonUrl, signal ? { signal } : undefined);
+        const template = tilejson.tiles?.[0];
+        if (template) {
+          const reportedMax = tilejson.maxzoom ?? this.config.tileMaxZoom;
+          const cappedMax =
+            this.config.tileMaxZoom !== undefined
+              ? Math.min(reportedMax ?? this.config.tileMaxZoom, this.config.tileMaxZoom)
+              : reportedMax;
+          return {
+            kind: 'raster-tiles',
+            urlTemplate: template,
+            tileSize: 256,
+            bounds: scene.bounds,
+            ...(tilejson.minzoom !== undefined ? { minZoom: tilejson.minzoom } : {}),
+            ...(cappedMax !== undefined ? { maxZoom: cappedMax } : {}),
+            attribution: this.config.attribution,
+          };
+        }
+      } catch {
+        // Fall through to COG / browse preview.
+      }
+    }
+
     const cogUrl = scene.metadata['cogUrl'];
     if (ENDPOINTS.titiler && typeof cogUrl === 'string' && cogUrl.startsWith('http')) {
       return {
@@ -176,8 +213,9 @@ export class StacImageryProvider implements ImageryProvider {
     const bounds = this.itemBounds(item);
     if (!bounds) return null;
 
-    const previewUrl = this.httpsOnly(pickAssetHref(item, this.config.previewAssetKeys));
+    const previewUrl = this.pickPreviewUrl(item);
     const cogUrl = this.httpsOnly(pickAssetHref(item, this.config.cogAssetKeys));
+    const tilejsonUrl = this.httpsOnly(pickAssetHref(item, this.config.tilejsonAssetKeys ?? []));
     const selfLink = item.links?.find((link) => link.rel === 'self')?.href;
     const resolution = this.config.resolutionOf(item);
 
@@ -194,10 +232,22 @@ export class StacImageryProvider implements ImageryProvider {
         ...item.properties,
         collection: item.collection,
         ...(cogUrl ? { cogUrl } : {}),
+        ...(tilejsonUrl ? { tilejsonUrl } : {}),
       },
       license: this.config.license,
       ...(item.geometry ? { geometry: item.geometry } : {}),
     };
+  }
+
+  /**
+   * Prefer HTTPS asset hrefs; fall back to a STAC `thumbnail` link (Earth
+   * Search Landsat keeps browse JPEGs on requester-pays S3 and only exposes
+   * an HTTPS redirect link).
+   */
+  private pickPreviewUrl(item: StacItem): string | undefined {
+    const fromAsset = this.httpsOnly(pickAssetHref(item, this.config.previewAssetKeys));
+    if (fromAsset) return fromAsset;
+    return this.httpsOnly(item.links?.find((link) => link.rel === 'thumbnail')?.href);
   }
 
   private itemBounds(item: StacItem): BoundingBox | null {

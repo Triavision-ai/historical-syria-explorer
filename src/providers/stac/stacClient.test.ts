@@ -23,7 +23,7 @@ describe('buildStacSearchBody', () => {
         maxCloudCover: 20,
         limit: 5,
       },
-      ['landsat-c2l2-sr'],
+      ['landsat-c2-l2'],
       { defaultLimit: 30, cloudCoverField: 'eo:cloud_cover' },
     );
     expect(body.bbox).toEqual([36, 35, 37, 36]);

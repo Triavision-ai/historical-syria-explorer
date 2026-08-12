@@ -2,9 +2,11 @@ import { StacImageryProvider } from '../stac/StacImageryProvider';
 import { ENDPOINTS } from '@/config/providers.config';
 
 const PLATFORM_LABELS: Record<string, string> = {
-  LANDSAT_1: 'Landsat 1 MSS',
-  LANDSAT_2: 'Landsat 2 MSS',
-  LANDSAT_3: 'Landsat 3 MSS',
+  'landsat-4': 'Landsat 4 TM',
+  'landsat-5': 'Landsat 5 TM',
+  'landsat-7': 'Landsat 7 ETM+',
+  'landsat-8': 'Landsat 8 OLI',
+  'landsat-9': 'Landsat 9 OLI-2',
   LANDSAT_4: 'Landsat 4 TM',
   LANDSAT_5: 'Landsat 5 TM',
   LANDSAT_7: 'Landsat 7 ETM+',
@@ -12,24 +14,31 @@ const PLATFORM_LABELS: Record<string, string> = {
   LANDSAT_9: 'Landsat 9 OLI-2',
 };
 
-/** MSS ≈ 60 m; TM/ETM+/OLI ≈ 30 m. */
-const MSS_PLATFORMS = new Set(['LANDSAT_1', 'LANDSAT_2', 'LANDSAT_3']);
-
 /**
- * Landsat archive (1972–present) via the public USGS LandsatLook STAC API.
- * No credentials required. Public-domain imagery.
+ * Landsat Collection 2 Level-2 (1982–present) via Microsoft Planetary Computer.
+ *
+ * Chosen over USGS LandsatLook (broken browser CORS + EROS login on browse
+ * paths) and Earth Search (thumbnail redirects to requester-pays S3 with no
+ * CORS — MapLibre cannot drape it). Planetary Computer returns CORS `*` on
+ * search, `rendered_preview`, and XYZ tilejson.
  */
 export function createLandsatProvider(): StacImageryProvider {
   return new StacImageryProvider({
     id: 'landsat',
     displayName: 'Landsat (USGS)',
     description:
-      'Landsat 1–9 archive from 1972 to today via the USGS LandsatLook STAC API. Public domain.',
+      'Landsat Collection 2 Level-2 archive (1982–today) via Microsoft Planetary Computer. Public domain.',
     endpoint: ENDPOINTS.landsatStac,
-    collections: ['landsat-c2l2-sr'],
-    temporalRange: { from: 1972, to: 'present' },
-    missions: Object.values(PLATFORM_LABELS),
-    attribution: 'USGS Landsat, courtesy of the U.S. Geological Survey',
+    collections: ['landsat-c2-l2'],
+    temporalRange: { from: 1982, to: 'present' },
+    missions: [
+      'Landsat 4 TM',
+      'Landsat 5 TM',
+      'Landsat 7 ETM+',
+      'Landsat 8 OLI',
+      'Landsat 9 OLI-2',
+    ],
+    attribution: 'USGS Landsat via Microsoft Planetary Computer',
     license: {
       id: 'public-domain',
       label: 'Public Domain (USGS)',
@@ -37,15 +46,14 @@ export function createLandsatProvider(): StacImageryProvider {
       redistributable: true,
     },
     cloudCoverField: 'eo:cloud_cover',
-    previewAssetKeys: ['rendered_preview', 'reduced_resolution_browse', 'thumbnail'],
-    // Only a true-color asset is useful as a tiled overlay; single bands
-    // (e.g. "red") would render grayscale through the COG tiler.
+    previewAssetKeys: ['rendered_preview', 'thumbnail'],
     cogAssetKeys: ['visual'],
+    tilejsonAssetKeys: ['tilejson'],
+    tileMaxZoom: 13,
     missionOf: (item) => {
       const platform = String(item.properties['platform'] ?? '');
-      return PLATFORM_LABELS[platform] ?? platform.replace('_', ' ') ?? 'Landsat';
+      return PLATFORM_LABELS[platform] ?? (platform.replace(/[_-]/g, ' ') || 'Landsat');
     },
-    resolutionOf: (item) =>
-      MSS_PLATFORMS.has(String(item.properties['platform'] ?? '')) ? 60 : 30,
+    resolutionOf: () => 30,
   });
 }
